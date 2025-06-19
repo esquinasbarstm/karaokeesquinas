@@ -1,11 +1,11 @@
 {
   "version": 2,
   "builds": [
-    { "src": "index.html", "use": "@vercel/static" },
-    { "src": "karaoke.html", "use": "@vercel/static" },
-    { "src": "console.html", "use": "@vercel/static" },
-    { "src": "garcom.html", "use": "@vercel/static" },
-    { "src": "karaoke-tv.html", "use": "@vercel/static" },
-    { "src": "api/**", "use": "@vercel/node" }
+    { "src": "api/buscar-video.js", "use": "@vercel/node" },
+    { "src": "*.html", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/api/buscar-video", "dest": "api/buscar-video.js" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
