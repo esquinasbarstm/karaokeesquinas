@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "api/buscar-video.js", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/api/buscar-video", "dest": "api/buscar-video.js" }
+  ]
+}
