@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Esquina's Bar – Sistema de Karaokê</title>
+  <style>
+    body {
+      background: #111; color: #fff; font-family: sans-serif;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; height: 100vh; text-align: center; padding: 20px;
+    }
+    h1 { margin-bottom: 30px; }
+    button {
+      padding: 14px 28px; margin: 10px; border: none; border-radius: 8px;
+      font-size: 16px; cursor: pointer; transition: 0.2s;
+      background: #ff0080; color: white;
+    }
+    button:hover { opacity: 0.8; }
+    .grupo { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>🎤 Bem-vindo ao Karaokê do Esquina's Bar</h1>
+
+  <div class="grupo">
+    <button onclick="irParaMesa()">Sou Cliente</button>
+    <button onclick="location.href='garcom.html'">Sou Garçom</button>
+    <button onclick="location.href='console.html'">Console do Karaokê</button>
+    <button onclick="location.href='karaoke-tv.html'">TV do Karaokê</button>
+  </div>
+
+  <script>
+    function irParaMesa() {
+      const mesa = prompt("Digite o número da mesa:");
+      if (mesa) {
+        location.href = `karaoke.html?mesa=${mesa}`;
+      }
+    }
+  </script>
+</body>
+</html>
