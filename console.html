@@ -99,7 +99,7 @@
     import {
       getFirestore, collection, doc, getDocs, onSnapshot,
       updateDoc, arrayRemove, serverTimestamp,
-      addDoc, query, orderBy, setDoc
+      query, orderBy, setDoc
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -114,13 +114,13 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    let mesas = [];
-    let filaAtual = [];
-
     const ulFila = document.getElementById("fila");
     const ulHist = document.getElementById("historico");
     const infoTocando = document.getElementById("infoTocando");
     const infoProxima = document.getElementById("infoProxima");
+
+    let mesas = [];
+    let filaAtual = [];
 
     document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("limparFila").addEventListener("click", limparFila);
@@ -175,12 +175,9 @@
           if (mesa.musicas.length > index) {
             filaAtual.push({ mesaId: mesa.mesaId, musica: mesa.musicas[index] });
             aindaTem = true;
-            if (mesa.musicas.length > index + 1) {
-              filaAtual.push({ mesaId: mesa.mesaId, musica: mesa.musicas[index + 1] });
-            }
           }
         }
-        index += 2;
+        index++;
       }
 
       renderizarFila();
@@ -201,8 +198,8 @@
           <span><strong>${item.musica}</strong> <span class="tag">Mesa ${item.mesaId}</span></span>
           <span>
             ${i === 0 ? `
-              <button class="tocar" onclick="forcarTocar()">Tocar agora</button>
-              <button class="remover" onclick="pularMusica()">Pular</button>
+              <button class="tocar" onclick="forcarTocar('${item.mesaId}', '${item.musica}')">Tocar agora</button>
+              <button class="remover" onclick="pularMusica('${item.mesaId}', '${item.musica}')">Pular</button>
             ` : `
               <button class="remover" onclick="removerMusica('${item.mesaId}', '${item.musica}')">Remover</button>
             `}
@@ -222,26 +219,35 @@
       }
     }
 
-    window.forcarTocar = async () => {
-      if (filaAtual.length === 0) return;
-      const primeira = filaAtual[0];
+    window.forcarTocar = async (mesaId, musica) => {
+      const mesaSnap = await getDocs(doc(db, "mesas", mesaId));
+      const musicas = mesaSnap.data()?.musicas || [];
+
+      const youtubeId = await buscarYoutubeId(mesaId, musica);
+
+      if (!youtubeId) return;
 
       await setDoc(doc(db, "status", "forcarTocar"), {
-        mesa: primeira.mesaId,
-        musica: primeira.musica,
+        mesa: mesaId,
+        musica: musica,
+        youtubeId,
         forcarEm: serverTimestamp()
       });
     };
 
-    window.pularMusica = async () => {
-      if (filaAtual.length === 0) return;
-      const primeira = filaAtual[0];
-      const mesaRef = doc(db, "mesas", primeira.mesaId);
+    async function buscarYoutubeId(mesaId, musica) {
+      try {
+        const response = await fetch(`/api/buscar-video?musica=${encodeURIComponent(musica)}`);
+        const json = await response.json();
+        return json?.videoId || null;
+      } catch (err) {
+        console.error("Erro ao buscar YouTube ID:", err);
+        return null;
+      }
+    }
 
-      await updateDoc(mesaRef, {
-        musicas: arrayRemove(primeira.musica),
-        ultimaAtualizacao: serverTimestamp()
-      });
+    window.pularMusica = async (mesaId, musica) => {
+      await removerMusica(mesaId, musica);
     };
 
     window.removerMusica = async (mesaId, musica) => {
