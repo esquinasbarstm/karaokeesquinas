@@ -6,6 +6,11 @@
   ],
   "routes": [
     { "src": "/api/buscar-video", "dest": "api/buscar-video.js" },
-    { "src": "/(.*)", "dest": "/index.html" }
+    { "src": "/index", "dest": "/index.html" },
+    { "src": "/karaoke", "dest": "/karaoke.html" },
+    { "src": "/console", "dest": "/console.html" },
+    { "src": "/garcom", "dest": "/garcom.html" },
+    { "src": "/karaoke-tv", "dest": "/karaoke-tv.html" },
+    { "src": "/", "dest": "/index.html" }
   ]
 }
