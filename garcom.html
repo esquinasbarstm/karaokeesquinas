@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel do Garçom - Esquina's Karaoke</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; }
+    .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    h1, h2 { color: #333; }
+    label { display: block; margin: 10px 0 5px; }
+    select, input, button { padding: 10px; width: 100%; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px; }
+    button { background: #007bff; color: white; cursor: pointer; }
+    button:hover { background: #0056b3; }
+    ul { list-style: none; padding: 0; }
+    li { background: #eee; margin: 5px 0; padding: 10px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; }
+    .fila li { background: #dff0d8; }
+    .remover, .tocar { padding: 6px 10px; border: none; border-radius: 4px; cursor: pointer; }
+    .remover { background: #dc3545; color: white; }
+    .tocar { background: #28a745; color: white; margin-left: 10px; }
+    #loginDiv { max-width: 400px; margin: 100px auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    .tocando-agora { font-size: 18px; font-weight: bold; background: #ffeeba; padding: 10px; border-radius: 5px; margin-bottom: 20px; color: #856404; }
+  </style>
+</head>
+<body>
+  <div id="loginDiv">
+    <h2>Login do Garçom</h2>
+    <input type="password" id="senha" placeholder="Digite a senha" />
+    <button onclick="login()">Entrar</button>
+  </div>
+
+  <div class="container" id="painel" style="display:none;">
+    <h1>Painel do Garçom</h1>
+
+    <label for="mesaSelect">Mesa:</label>
+    <select id="mesaSelect"></select>
+
+    <label for="musicaInput">Música:</label>
+    <input type="text" id="musicaInput" placeholder="Digite o nome da música" />
+
+    <label for="linkInput">Link do YouTube (karaokê):</label>
+    <input type="text" id="linkInput" placeholder="https://www.youtube.com/watch?v=..." />
+
+    <button onclick="adicionarMusica()">Adicionar à Mesa</button>
+
+    <h2>Músicas da Mesa Selecionada</h2>
+    <ul id="listaMesa"></ul>
+
+    <h2>Tocando Agora</h2>
+    <div id="tocandoAgora" class="tocando-agora">Nenhuma música tocando</div>
+
+    <h2>Fila Global</h2>
+    <ul id="filaGlobal"></ul>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getFirestore, collection, getDocs, doc, getDoc, setDoc,
+      updateDoc, arrayUnion, arrayRemove, serverTimestamp,
+      onSnapshot, addDoc
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBGkT5z6i3KycQHvuutOYiUOeX1hDG15lw",
+      authDomain: "esquina-s-karaoke.firebaseapp.com",
+      projectId: "esquina-s-karaoke",
+      storageBucket: "esquina-s-karaoke.firebasestorage.app",
+      messagingSenderId: "259976490299",
+      appId: "1:259976490299:web:a7964bf79f1ead7e5e5b1e"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const senhaCorreta = "esquinas123";
+    const tocandoAgoraDiv = document.getElementById("tocandoAgora");
+
+    window.login = () => {
+      const senha = document.getElementById("senha").value;
+      if (senha === senhaCorreta) {
+        document.getElementById("loginDiv").style.display = "none";
+        document.getElementById("painel").style.display = "block";
+        carregarMesas();
+        observarFilaGlobal();
+      } else {
+        alert("Senha incorreta");
+      }
+    };
+
+    function carregarMesas() {
+      const select = document.getElementById("mesaSelect");
+      for (let i = 1; i <= 100; i++) {
+        const opt = document.createElement("option");
+        opt.value = i;
+        opt.textContent = `Mesa ${i}`;
+        select.appendChild(opt);
+      }
+      select.addEventListener("change", atualizarListaMesa);
+      atualizarListaMesa();
+    }
+
+    window.adicionarMusica = async function () {
+      const mesa = document.getElementById("mesaSelect").value;
+      const musica = document.getElementById("musicaInput").value.trim();
+      const link = document.getElementById("linkInput").value.trim();
+
+      if (!musica || !link) {
+        alert("Preencha todos os campos!");
+        return;
+      }
+
+      const youtubeId = extrairIdYoutube(link);
+      if (!youtubeId) {
+        alert("Link do YouTube inválido!");
+        return;
+      }
+
+      const mesaRef = doc(db, "mesas", mesa);
+      const docSnap = await getDoc(mesaRef);
+
+      if (!docSnap.exists()) {
+        await setDoc(mesaRef, {
+          musicas: [musica],
+          ultimaAtualizacao: serverTimestamp()
+        });
+      } else {
+        await updateDoc(mesaRef, {
+          musicas: arrayUnion(musica),
+          ultimaAtualizacao: serverTimestamp()
+        });
+      }
+
+      // Adiciona na fila com o youtubeId
+      await addDoc(collection(db, "fila"), {
+        mesa: mesa,
+        musica: musica,
+        youtubeId: youtubeId,
+        timestamp: serverTimestamp()
+      });
+
+      document.getElementById("musicaInput").value = "";
+      document.getElementById("linkInput").value = "";
+    };
+
+    function extrairIdYoutube(url) {
+      const regex = /(?:youtube\.com\/(?:.*v=|v\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+      const match = url.match(regex);
+      return match ? match[1] : null;
+    }
+
+    async function atualizarListaMesa() {
+      const mesa = document.getElementById("mesaSelect").value;
+      const lista = document.getElementById("listaMesa");
+      const mesaRef = doc(db, "mesas", mesa);
+      const docSnap = await getDoc(mesaRef);
+
+      lista.innerHTML = "";
+      const musicas = docSnap.exists() ? docSnap.data().musicas || [] : [];
+
+      musicas.forEach(musica => {
+        const li = document.createElement("li");
+        li.innerHTML = `${musica} <button class='remover' onclick="removerMusica('${mesa}', '${musica}')">Remover</button>`;
+        lista.appendChild(li);
+      });
+    }
+
+    window.removerMusica = async function (mesa, musica) {
+      const mesaRef = doc(db, "mesas", mesa);
+      await updateDoc(mesaRef, {
+        musicas: arrayRemove(musica),
+        ultimaAtualizacao: serverTimestamp()
+      });
+    };
+
+    function observarFilaGlobal() {
+      onSnapshot(collection(db, "mesas"), async () => {
+        const snapshot = await getDocs(collection(db, "mesas"));
+        const mesas = [];
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          mesas.push({ mesaId: doc.id, musicas: data.musicas || [] });
+        });
+
+        const fila = [];
+        let index = 0;
+        let ativo = true;
+
+        while (ativo) {
+          ativo = false;
+          for (let mesa of mesas) {
+            if (mesa.musicas.length > index) {
+              fila.push({ mesaId: mesa.mesaId, musica: mesa.musicas[index] });
+              ativo = true;
+              if (mesa.musicas.length > index + 1) {
+                fila.push({ mesaId: mesa.mesaId, musica: mesa.musicas[index + 1] });
+              }
+            }
+          }
+          index += 2;
+        }
+
+        const ul = document.getElementById("filaGlobal");
+        ul.innerHTML = "";
+
+        if (fila.length > 0) {
+          tocandoAgoraDiv.textContent = `🎵 Mesa ${fila[0].mesaId} - ${fila[0].musica}`;
+        } else {
+          tocandoAgoraDiv.textContent = "Nenhuma música tocando";
+        }
+
+        fila.forEach((item, i) => {
+          const li = document.createElement("li");
+          li.innerHTML = `#${i + 1} - Mesa ${item.mesaId}: ${item.musica} ${i === 0 ? `<button class='tocar' onclick="tocarMusica('${item.mesaId}', '${item.musica}')">Tocar agora</button>` : ''}`;
+          ul.appendChild(li);
+        });
+      });
+    }
+
+    window.tocarMusica = async function (mesa, musica) {
+      await addDoc(collection(db, "historico"), {
+        mesa: mesa,
+        musica: musica,
+        tocadaEm: serverTimestamp()
+      });
+      await updateDoc(doc(db, "mesas", mesa), {
+        musicas: arrayRemove(musica),
+        ultimaAtualizacao: serverTimestamp()
+      });
+    };
+  </script>
+</body>
+</html>

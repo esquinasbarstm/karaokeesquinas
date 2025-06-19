@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Karaokê - Esquina's Bar</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f9f9f9; }
+    input, button { padding: 8px; margin-top: 10px; display: block; width: 100%; max-width: 400px; }
+    ul { list-style: none; padding: 0; max-width: 400px; }
+    li { background: #fff; padding: 8px; margin: 5px 0; border-radius: 5px; box-shadow: 0 0 3px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+    .remove { background: red; color: white; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1 id="titulo">Karaokê</h1>
+
+  <input type="text" id="musicaInput" placeholder="Digite o nome da música" />
+  <input type="text" id="linkInput" placeholder="Link do YouTube (karaokê)" />
+  <button onclick="adicionarMusica()">Adicionar à fila</button>
+
+  <h3>🎵 Suas músicas:</h3>
+  <ul id="listaMusicas"></ul>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getFirestore, doc, getDoc, setDoc, updateDoc,
+      arrayUnion, arrayRemove, onSnapshot, serverTimestamp,
+      addDoc, collection
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBGkT5z6i3KycQHvuutOYiUOeX1hDG15lw",
+      authDomain: "esquina-s-karaoke.firebaseapp.com",
+      projectId: "esquina-s-karaoke",
+      storageBucket: "esquina-s-karaoke.firebasestorage.app",
+      messagingSenderId: "259976490299",
+      appId: "1:259976490299:web:a7964bf79f1ead7e5e5b1e"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const params = new URLSearchParams(window.location.search);
+    const mesa = params.get("mesa") || "sem-mesa";
+
+    const lista = document.getElementById("listaMusicas");
+
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("titulo").textContent = `Karaokê - Mesa ${mesa}`;
+      observarMusicas();
+    });
+
+    async function adicionarMusica() {
+      const musicaInput = document.getElementById("musicaInput");
+      const linkInput = document.getElementById("linkInput");
+      const nomeMusica = musicaInput.value.trim();
+      const link = linkInput.value.trim();
+
+      if (!nomeMusica || !link) {
+        alert("Preencha todos os campos.");
+        return;
+      }
+
+      const youtubeId = extrairIdYoutube(link);
+      if (!youtubeId) {
+        alert("Link do YouTube inválido!");
+        return;
+      }
+
+      const mesaRef = doc(db, "mesas", mesa);
+      const docSnap = await getDoc(mesaRef);
+
+      if (!docSnap.exists()) {
+        await setDoc(mesaRef, {
+          musicas: [nomeMusica],
+          ultimaAtualizacao: serverTimestamp()
+        });
+      } else {
+        await updateDoc(mesaRef, {
+          musicas: arrayUnion(nomeMusica),
+          ultimaAtualizacao: serverTimestamp()
+        });
+      }
+
+      // Também adiciona na fila geral
+      await addDoc(collection(db, "fila"), {
+        mesa: mesa,
+        musica: nomeMusica,
+        youtubeId: youtubeId,
+        timestamp: serverTimestamp()
+      });
+
+      musicaInput.value = "";
+      linkInput.value = "";
+    }
+
+    function extrairIdYoutube(url) {
+      const regex = /(?:youtube\.com\/(?:.*v=|v\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+      const match = url.match(regex);
+      return match ? match[1] : null;
+    }
+
+    function observarMusicas() {
+      const mesaRef = doc(db, "mesas", mesa);
+
+      onSnapshot(mesaRef, (docSnap) => {
+        const data = docSnap.data();
+        const musicas = data?.musicas || [];
+        renderizarLista(musicas);
+      });
+    }
+
+    async function removerMusica(nome) {
+      const mesaRef = doc(db, "mesas", mesa);
+      await updateDoc(mesaRef, {
+        musicas: arrayRemove(nome),
+        ultimaAtualizacao: serverTimestamp()
+      });
+    }
+
+    function renderizarLista(musicas) {
+      lista.innerHTML = '';
+      if (musicas.length === 0) {
+        lista.innerHTML = "<li>Nenhuma música adicionada ainda.</li>";
+        return;
+      }
+
+      musicas.forEach((musica) => {
+        const li = document.createElement("li");
+        li.innerHTML = `<span>${musica}</span> <button class="remove" onclick="removerMusica('${musica}')">Remover</button>`;
+        lista.appendChild(li);
+      });
+    }
+
+    window.adicionarMusica = adicionarMusica;
+    window.removerMusica = removerMusica;
+  </script>
+</body>
+</html>
