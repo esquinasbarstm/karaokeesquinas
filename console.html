@@ -67,6 +67,8 @@
       margin-left: 10px;
     }
   </style>
+  <!-- ✅ SortableJS para drag-and-drop -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -89,12 +91,12 @@
       <ul id="historico"></ul>
     </div>
   </div>
-  <script type="module" src="https://gist.githubusercontent.com/yagoporto/console-upgrade.js"></script>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import {
       getFirestore, collection, doc, getDocs, onSnapshot,
-      updateDoc, arrayRemove, serverTimestamp, query, orderBy, setDoc, getDoc
+      updateDoc, arrayRemove, serverTimestamp, query, orderBy, setDoc
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -121,6 +123,14 @@
       document.getElementById("limparFila").addEventListener("click", limparFila);
 
       onSnapshot(collection(db, "mesas"), gerarFilaRodizio);
+
+      onSnapshot(doc(db, "sistema", "recalcularFila"), async (docSnap) => {
+        if (docSnap.exists()) {
+          console.log("🔄 Recalculando fila após trigger...");
+          await gerarFilaRodizio();
+          await setDoc(doc(db, "sistema", "recalcularFila"), { atualizar: false });
+        }
+      });
 
       const qHist = query(collection(db, "historico"), orderBy("tocadaEm", "desc"));
       onSnapshot(qHist, (snapshot) => {
@@ -167,11 +177,11 @@
           const primeira = mesa.musicas[index];
           const segunda = mesa.musicas[index + 1];
 
-          if (primeira) {
+          if (typeof primeira === 'string') {
             filaRodizio.push({ mesaId: mesa.mesaId, musica: primeira });
             aindaTem = true;
           }
-          if (segunda) {
+          if (typeof segunda === 'string') {
             filaRodizio.push({ mesaId: mesa.mesaId, musica: segunda });
             aindaTem = true;
           }
@@ -180,12 +190,13 @@
       }
 
       await setDoc(doc(db, "sistema", "filaOrdenada"), {
-        lista: filaRodizio,
+        fila: filaRodizio,
         atualizadaEm: serverTimestamp()
       });
 
       renderizarFila();
     }
+
     function renderizarFila() {
       ulFila.innerHTML = '';
       if (filaRodizio.length === 0) {
@@ -220,6 +231,33 @@
       } else {
         infoProxima.textContent = "Nenhuma música após a atual.";
       }
+
+      // Ativa drag-and-drop após renderização
+      new Sortable(ulFila, {
+        animation: 150,
+        onEnd: salvarOrdemManual
+      });
+    }
+
+    async function salvarOrdemManual() {
+      const novaOrdem = [];
+
+      ulFila.querySelectorAll("li").forEach((li) => {
+        const musica = li.querySelector("strong")?.textContent;
+        const mesaSpan = li.querySelector(".tag")?.textContent;
+        const mesaId = mesaSpan?.replace("Mesa ", "").trim();
+
+        if (musica && mesaId) {
+          novaOrdem.push({ mesaId, musica });
+        }
+      });
+
+      await setDoc(doc(db, "sistema", "filaOrdenada"), {
+        fila: novaOrdem,
+        atualizadaEm: serverTimestamp()
+      });
+
+      console.log("🎯 Nova ordem manual salva:", novaOrdem);
     }
 
     window.forcarTocar = async (mesaId, musica) => {
@@ -255,17 +293,19 @@
         musicas: arrayRemove(musica),
         ultimaAtualizacao: serverTimestamp()
       });
+      await gerarFilaRodizio();
     };
 
     async function limparFila() {
       const snapshot = await getDocs(collection(db, "mesas"));
-      snapshot.forEach(async (docSnap) => {
+      for (let docSnap of snapshot.docs) {
         const mesaRef = doc(db, "mesas", docSnap.id);
         await updateDoc(mesaRef, {
           musicas: [],
           ultimaAtualizacao: serverTimestamp()
         });
-      });
+      }
+      await gerarFilaRodizio();
     }
   </script>
 </body>
