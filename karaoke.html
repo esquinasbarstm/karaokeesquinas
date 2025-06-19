@@ -5,21 +5,89 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Karaokê - Esquina's Bar</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; background: #f9f9f9; }
-    input, button { padding: 10px; margin-top: 10px; display: block; width: 100%; max-width: 400px; font-size: 16px; }
-    ul { list-style: none; padding: 0; max-width: 400px; }
-    li { background: #fff; padding: 10px; margin: 5px 0; border-radius: 5px; box-shadow: 0 0 3px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
-    .remove { background: red; color: white; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      background: #f2f2f2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 { margin-bottom: 20px; }
+
+    input, button {
+      padding: 12px;
+      margin: 10px 0;
+      width: 100%;
+      max-width: 400px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      background: #ff0080;
+      color: white;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      max-width: 400px;
+      width: 100%;
+    }
+
+    li {
+      background: white;
+      padding: 12px;
+      margin: 6px 0;
+      border-radius: 8px;
+      box-shadow: 0 0 4px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .destaque {
+      background: #d7ffd9 !important;
+    }
+
+    .remove {
+      background: red;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+
+    .mensagem {
+      margin-top: 10px;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
   <h1 id="titulo">Karaokê</h1>
 
-  <input type="text" id="musicaInput" placeholder="Digite o nome da música (ex: Evidências Zezé)" />
-  <button onclick="adicionarMusica()">Adicionar à fila</button>
+  <input type="text" id="nomeInput" placeholder="Seu nome (opcional)" />
+  <input type="text" id="musicaInput" placeholder="Digite uma música (ex: Evidências Zezé Di Camargo)" />
+  <button id="botaoAdicionar" onclick="adicionarMusica()">Adicionar à fila</button>
+  <div class="mensagem" id="mensagem"></div>
 
   <h3>🎵 Suas músicas:</h3>
   <ul id="listaMusicas"></ul>
+
+  <h3>🎤 Fila de reprodução:</h3>
+  <ul id="filaReproducao"></ul>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -43,33 +111,50 @@
 
     const params = new URLSearchParams(window.location.search);
     const mesa = params.get("mesa") || "sem-mesa";
-
     const lista = document.getElementById("listaMusicas");
+    const filaLista = document.getElementById("filaReproducao");
+    const mensagem = document.getElementById("mensagem");
+    const botao = document.getElementById("botaoAdicionar");
 
     document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("titulo").textContent = `Karaokê - Mesa ${mesa}`;
       observarMusicas();
+      observarFila();
     });
 
     async function adicionarMusica() {
       const musicaInput = document.getElementById("musicaInput");
-      const nomeMusica = musicaInput.value.trim();
+      const nomeInput = document.getElementById("nomeInput");
+      let nomeMusica = musicaInput.value.trim();
+      const nomePessoa = nomeInput.value.trim();
+      mensagem.textContent = "";
+      mensagem.style.color = "green";
 
       if (!nomeMusica) {
-        alert("Digite o nome da música.");
+        mensagem.textContent = "Digite o nome da música.";
+        mensagem.style.color = "red";
         return;
       }
 
+      if (!nomeMusica.toLowerCase().includes("karaoke")) {
+        nomeMusica += " karaoke";
+      }
+
+      botao.disabled = true;
+      botao.textContent = "Adicionando...";
+
       try {
-        const res = await fetch(`/api/buscar-video?q=${encodeURIComponent(nomeMusica)}`);
+        const res = await fetch(`https://karaokeesquinas.vercel.app/api/buscar-video?q=${encodeURIComponent(nomeMusica)}`);
         const data = await res.json();
 
         if (!data.youtubeId) {
-          alert("Música não encontrada. Tente outro nome.");
+          mensagem.textContent = "Música não encontrada. Tente outro nome.";
+          mensagem.style.color = "red";
+          botao.disabled = false;
+          botao.textContent = "Adicionar à fila";
           return;
         }
 
-        // Atualiza documento da mesa
         const mesaRef = doc(db, "mesas", mesa);
         const docSnap = await getDoc(mesaRef);
 
@@ -85,19 +170,24 @@
           });
         }
 
-        // Adiciona à fila
         await addDoc(collection(db, "fila"), {
           mesa: mesa,
           musica: data.titulo,
           youtubeId: data.youtubeId,
+          nome: nomePessoa || "Cliente",
           timestamp: serverTimestamp()
         });
 
         musicaInput.value = "";
-        alert("🎶 Música adicionada com sucesso!");
+        mensagem.textContent = `🎶 Adicionada: ${data.titulo}`;
+        mensagem.style.color = "green";
       } catch (error) {
         console.error(error);
-        alert("Erro ao adicionar música.");
+        mensagem.textContent = "Erro ao adicionar música.";
+        mensagem.style.color = "red";
+      } finally {
+        botao.disabled = false;
+        botao.textContent = "Adicionar à fila";
       }
     }
 
@@ -129,6 +219,45 @@
         const li = document.createElement("li");
         li.innerHTML = `<span>${musica}</span> <button class="remove" onclick="removerMusica('${musica}')">Remover</button>`;
         lista.appendChild(li);
+      });
+    }
+
+    function observarFila() {
+      const filaRef = collection(db, "fila");
+      onSnapshot(filaRef, (snapshot) => {
+        const musicas = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          musicas.push({
+            id: doc.id,
+            mesa: data.mesa,
+            musica: data.musica,
+            nome: data.nome || "Cliente",
+            timestamp: data.timestamp?.toDate() || new Date()
+          });
+        });
+
+        musicas.sort((a, b) => a.timestamp - b.timestamp);
+        renderizarFila(musicas);
+      });
+    }
+
+    function renderizarFila(musicas) {
+      filaLista.innerHTML = '';
+      if (musicas.length === 0) {
+        filaLista.innerHTML = "<li>Fila vazia no momento.</li>";
+        return;
+      }
+
+      let posicao = 1;
+
+      musicas.forEach((item) => {
+        const li = document.createElement("li");
+        li.innerHTML = `<strong>${posicao++}.</strong> ${item.musica} <small>(${item.nome} - Mesa ${item.mesa})</small>`;
+        if (item.mesa === mesa) {
+          li.classList.add("destaque");
+        }
+        filaLista.appendChild(li);
       });
     }
 
