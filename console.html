@@ -71,35 +71,30 @@
 <body>
   <div class="container">
     <h1>🎤 Console do Karaokê</h1>
-
     <div class="section" id="tocandoAgora" style="background:#e3ffe6; border-left: 5px solid #28a745;">
       <h2>🎧 Tocando Agora</h2>
       <p id="infoTocando">Nenhuma música em reprodução.</p>
     </div>
-
     <div class="section" id="proximaMusica" style="background:#fff7e6; border-left: 5px solid #ffa500;">
       <h2>🔜 Próxima Música da Fila</h2>
       <p id="infoProxima">Carregando...</p>
     </div>
-
     <div class="section">
       <h2>🎶 Fila Atual</h2>
       <button id="limparFila" class="limpar">Limpar Fila</button>
       <ul id="fila"></ul>
     </div>
-
     <div class="section">
       <h2>📜 Histórico de Músicas Tocadas</h2>
       <ul id="historico"></ul>
     </div>
   </div>
-
+  <script type="module" src="https://gist.githubusercontent.com/yagoporto/console-upgrade.js"></script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import {
       getFirestore, collection, doc, getDocs, onSnapshot,
-      updateDoc, arrayRemove, serverTimestamp,
-      query, orderBy, setDoc
+      updateDoc, arrayRemove, serverTimestamp, query, orderBy, setDoc, getDoc
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -120,12 +115,12 @@
     const infoProxima = document.getElementById("infoProxima");
 
     let mesas = [];
-    let filaAtual = [];
+    let filaRodizio = [];
 
     document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("limparFila").addEventListener("click", limparFila);
 
-      onSnapshot(collection(db, "mesas"), gerarFila);
+      onSnapshot(collection(db, "mesas"), gerarFilaRodizio);
 
       const qHist = query(collection(db, "historico"), orderBy("tocadaEm", "desc"));
       onSnapshot(qHist, (snapshot) => {
@@ -155,43 +150,51 @@
       });
     });
 
-    async function gerarFila() {
+    async function gerarFilaRodizio() {
       const snapshot = await getDocs(collection(db, "mesas"));
       mesas = snapshot.docs.map(doc => ({
         mesaId: doc.id,
         musicas: doc.data().musicas || []
       }));
-      montarFilaRodizio();
-    }
 
-    function montarFilaRodizio() {
-      filaAtual = [];
+      filaRodizio = [];
       let index = 0;
       let aindaTem = true;
 
       while (aindaTem) {
         aindaTem = false;
         for (let mesa of mesas) {
-          if (mesa.musicas.length > index) {
-            filaAtual.push({ mesaId: mesa.mesaId, musica: mesa.musicas[index] });
+          const primeira = mesa.musicas[index];
+          const segunda = mesa.musicas[index + 1];
+
+          if (primeira) {
+            filaRodizio.push({ mesaId: mesa.mesaId, musica: primeira });
+            aindaTem = true;
+          }
+          if (segunda) {
+            filaRodizio.push({ mesaId: mesa.mesaId, musica: segunda });
             aindaTem = true;
           }
         }
-        index++;
+        index += 2;
       }
+
+      await setDoc(doc(db, "sistema", "filaOrdenada"), {
+        lista: filaRodizio,
+        atualizadaEm: serverTimestamp()
+      });
 
       renderizarFila();
     }
-
     function renderizarFila() {
       ulFila.innerHTML = '';
-      if (filaAtual.length === 0) {
+      if (filaRodizio.length === 0) {
         ulFila.innerHTML = '<li>Nenhuma música na fila.</li>';
         infoProxima.textContent = "Nenhuma música após a atual.";
         return;
       }
 
-      filaAtual.forEach((item, i) => {
+      filaRodizio.forEach((item, i) => {
         const li = document.createElement("li");
         if (i === 0) li.classList.add("atual");
         li.innerHTML = `
@@ -208,8 +211,8 @@
         ulFila.appendChild(li);
       });
 
-      if (filaAtual.length > 1) {
-        const proxima = filaAtual[1];
+      if (filaRodizio.length > 1) {
+        const proxima = filaRodizio[1];
         infoProxima.innerHTML = `
           <strong>${proxima.musica}</strong>
           <span class="tag">Mesa ${proxima.mesaId}</span>
@@ -220,22 +223,18 @@
     }
 
     window.forcarTocar = async (mesaId, musica) => {
-      const mesaSnap = await getDocs(doc(db, "mesas", mesaId));
-      const musicas = mesaSnap.data()?.musicas || [];
-
-      const youtubeId = await buscarYoutubeId(mesaId, musica);
-
+      const youtubeId = await buscarYoutubeId(musica);
       if (!youtubeId) return;
 
       await setDoc(doc(db, "status", "forcarTocar"), {
         mesa: mesaId,
-        musica: musica,
+        musica,
         youtubeId,
         forcarEm: serverTimestamp()
       });
     };
 
-    async function buscarYoutubeId(mesaId, musica) {
+    async function buscarYoutubeId(musica) {
       try {
         const response = await fetch(`/api/buscar-video?musica=${encodeURIComponent(musica)}`);
         const json = await response.json();

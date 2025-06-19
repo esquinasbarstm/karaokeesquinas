@@ -249,11 +249,37 @@
         return;
       }
 
-      let posicao = 1;
-
+      // Agrupa músicas por mesa
+      const mesasMap = {};
       musicas.forEach((item) => {
+        if (!mesasMap[item.mesa]) mesasMap[item.mesa] = [];
+        mesasMap[item.mesa].push(item);
+      });
+
+      // Ordena as músicas de cada mesa por ordem de chegada
+      Object.values(mesasMap).forEach(lista =>
+        lista.sort((a, b) => a.timestamp - b.timestamp)
+      );
+
+      // Monta a fila final com rodízio de 2 por mesa por rodada
+      const filaFinal = [];
+      let aindaTem = true;
+
+      while (aindaTem) {
+        aindaTem = false;
+        for (const mesa in mesasMap) {
+          const musicasDaMesa = mesasMap[mesa];
+          if (musicasDaMesa.length > 0) {
+            aindaTem = true;
+            filaFinal.push(...musicasDaMesa.splice(0, 2));
+          }
+        }
+      }
+
+      // Renderiza a lista reorganizada
+      filaFinal.forEach((item, index) => {
         const li = document.createElement("li");
-        li.innerHTML = `<strong>${posicao++}.</strong> ${item.musica} <small>(${item.nome} - Mesa ${item.mesa})</small>`;
+        li.innerHTML = `<strong>${index + 1}.</strong> ${item.musica} <small>(${item.nome} - Mesa ${item.mesa})</small>`;
         if (item.mesa === mesa) {
           li.classList.add("destaque");
         }
