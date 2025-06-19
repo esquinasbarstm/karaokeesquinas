@@ -6,17 +6,16 @@
   <title>Karaokê - Esquina's Bar</title>
   <style>
     body { font-family: sans-serif; padding: 20px; background: #f9f9f9; }
-    input, button { padding: 8px; margin-top: 10px; display: block; width: 100%; max-width: 400px; }
+    input, button { padding: 10px; margin-top: 10px; display: block; width: 100%; max-width: 400px; font-size: 16px; }
     ul { list-style: none; padding: 0; max-width: 400px; }
-    li { background: #fff; padding: 8px; margin: 5px 0; border-radius: 5px; box-shadow: 0 0 3px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+    li { background: #fff; padding: 10px; margin: 5px 0; border-radius: 5px; box-shadow: 0 0 3px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
     .remove { background: red; color: white; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer; }
   </style>
 </head>
 <body>
   <h1 id="titulo">Karaokê</h1>
 
-  <input type="text" id="musicaInput" placeholder="Digite o nome da música" />
-  <input type="text" id="linkInput" placeholder="Link do YouTube (karaokê)" />
+  <input type="text" id="musicaInput" placeholder="Digite o nome da música (ex: Evidências Zezé)" />
   <button onclick="adicionarMusica()">Adicionar à fila</button>
 
   <h3>🎵 Suas músicas:</h3>
@@ -54,57 +53,56 @@
 
     async function adicionarMusica() {
       const musicaInput = document.getElementById("musicaInput");
-      const linkInput = document.getElementById("linkInput");
       const nomeMusica = musicaInput.value.trim();
-      const link = linkInput.value.trim();
 
-      if (!nomeMusica || !link) {
-        alert("Preencha todos os campos.");
+      if (!nomeMusica) {
+        alert("Digite o nome da música.");
         return;
       }
 
-      const youtubeId = extrairIdYoutube(link);
-      if (!youtubeId) {
-        alert("Link do YouTube inválido!");
-        return;
-      }
+      try {
+        const res = await fetch(`/api/buscar-video?q=${encodeURIComponent(nomeMusica)}`);
+        const data = await res.json();
 
-      const mesaRef = doc(db, "mesas", mesa);
-      const docSnap = await getDoc(mesaRef);
+        if (!data.youtubeId) {
+          alert("Música não encontrada. Tente outro nome.");
+          return;
+        }
 
-      if (!docSnap.exists()) {
-        await setDoc(mesaRef, {
-          musicas: [nomeMusica],
-          ultimaAtualizacao: serverTimestamp()
+        // Atualiza documento da mesa
+        const mesaRef = doc(db, "mesas", mesa);
+        const docSnap = await getDoc(mesaRef);
+
+        if (!docSnap.exists()) {
+          await setDoc(mesaRef, {
+            musicas: [data.titulo],
+            ultimaAtualizacao: serverTimestamp()
+          });
+        } else {
+          await updateDoc(mesaRef, {
+            musicas: arrayUnion(data.titulo),
+            ultimaAtualizacao: serverTimestamp()
+          });
+        }
+
+        // Adiciona à fila
+        await addDoc(collection(db, "fila"), {
+          mesa: mesa,
+          musica: data.titulo,
+          youtubeId: data.youtubeId,
+          timestamp: serverTimestamp()
         });
-      } else {
-        await updateDoc(mesaRef, {
-          musicas: arrayUnion(nomeMusica),
-          ultimaAtualizacao: serverTimestamp()
-        });
+
+        musicaInput.value = "";
+        alert("🎶 Música adicionada com sucesso!");
+      } catch (error) {
+        console.error(error);
+        alert("Erro ao adicionar música.");
       }
-
-      // Também adiciona na fila geral
-      await addDoc(collection(db, "fila"), {
-        mesa: mesa,
-        musica: nomeMusica,
-        youtubeId: youtubeId,
-        timestamp: serverTimestamp()
-      });
-
-      musicaInput.value = "";
-      linkInput.value = "";
-    }
-
-    function extrairIdYoutube(url) {
-      const regex = /(?:youtube\.com\/(?:.*v=|v\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-      const match = url.match(regex);
-      return match ? match[1] : null;
     }
 
     function observarMusicas() {
       const mesaRef = doc(db, "mesas", mesa);
-
       onSnapshot(mesaRef, (docSnap) => {
         const data = docSnap.data();
         const musicas = data?.musicas || [];
