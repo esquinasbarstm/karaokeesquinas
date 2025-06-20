@@ -62,6 +62,7 @@
     let player;
     let tocandoAgora = null;
     let musicaTimeout = null;
+    let forcarDataPendente = null;
 
     window.onYouTubeIframeAPIReady = () => {
       player = new YT.Player('player', {
@@ -76,7 +77,10 @@
           origin: window.location.origin
         },
         events: {
-          onReady: tocarProxima,
+          onReady: () => {
+            tocarProxima();
+            if (forcarDataPendente) tocarForcada(forcarDataPendente);
+          },
           onError: onPlayerError,
           onStateChange: onPlayerStateChange
         }
@@ -121,7 +125,7 @@
         if (player && typeof player.loadVideoById === 'function') {
           player.loadVideoById(youtubeId);
         } else {
-          console.warn("🚫 Player ainda não carregado. Tentando novamente...");
+          console.warn("⚠️ Player ainda não carregado (tocarProxima).");
           setTimeout(tocarProxima, 1000);
           return;
         }
@@ -147,13 +151,9 @@
 
     function onPlayerStateChange(event) {
       clearTimeout(musicaTimeout);
-
-      if (event.data === YT.PlayerState.ENDED) {
-        encerrarMusica();
-      }
-
+      if (event.data === YT.PlayerState.ENDED) encerrarMusica();
       if (event.data === YT.PlayerState.PLAYING) {
-        musicaTimeout = setTimeout(encerrarMusica, 10 * 60 * 1000); // segurança: pular após 10min
+        musicaTimeout = setTimeout(encerrarMusica, 10 * 60 * 1000);
       }
     }
 
@@ -194,8 +194,9 @@
     }
 
     function tocarForcada(data) {
-      if (!data || (data.musica === tocandoAgora?.musica && data.mesa === tocandoAgora?.mesa)) return;
+      forcarDataPendente = data;
 
+      if (!data || (data.musica === tocandoAgora?.musica && data.mesa === tocandoAgora?.mesa)) return;
       tocandoAgora = { mesa: data.mesa, musica: data.musica };
 
       if (player && typeof player.loadVideoById === 'function') {
@@ -209,7 +210,7 @@
           atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
         });
       } else {
-        console.warn("🚫 Player ainda não carregado (forçada).");
+        console.warn("⚠️ Player ainda não carregado (forçada).");
         setTimeout(() => tocarForcada(data), 1000);
       }
     }
