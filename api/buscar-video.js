@@ -15,19 +15,20 @@ export default async function handler(req) {
     }
 
     const API_KEY = 'AIzaSyA3Lwmtd2Wn4rRF-xhLXIUhb-PjfFhMXxc';
-    const apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=5&q=${encodeURIComponent(query)}&key=${API_KEY}`;
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=5&q=${encodeURIComponent(query)}&key=${API_KEY}`;
 
-    const resposta = await fetch(apiUrl);
+    const resposta = await fetch(url);
+    const texto = await resposta.text(); // <-- captura o erro bruto
+
     if (!resposta.ok) {
-      const erro = await resposta.text();
-      console.error("Erro YouTube:", erro);
-      return new Response(JSON.stringify({ error: 'Erro YouTube', detalhes: erro }), {
+      console.error("❌ Erro bruto da API do YouTube:", texto);
+      return new Response(texto, {
         status: 502,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    const dados = await resposta.json();
+    const dados = JSON.parse(texto);
     const video = dados.items?.find(item => item.id?.videoId);
 
     if (!video) {
@@ -37,13 +38,16 @@ export default async function handler(req) {
       });
     }
 
-    return new Response(JSON.stringify({
-      youtubeId: video.id.videoId,
-      titulo: video.snippet.title,
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({
+        youtubeId: video.id.videoId,
+        titulo: video.snippet.title,
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
   } catch (err) {
     console.error("Erro interno:", err);
     return new Response(JSON.stringify({ error: 'Erro interno', detalhes: err.message }), {
