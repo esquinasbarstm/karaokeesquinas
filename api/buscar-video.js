@@ -14,11 +14,11 @@ export default async function handler(req) {
       });
     }
 
-    const API_KEY = 'AIzaSyA3Lwmtd2Wn4rRF-xhLXIUhb-PjfFhMXxc';
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=5&q=${encodeURIComponent(query)}&key=${AIzaSyA3Lwmtd2Wn4rRF-xhLXIUhb-PjfFhMXxc}`;
+    const API_KEY = 'AIzaSyA3Lwmtd2Wn4rRF-xhLXIUhb-PjfFhMXxc'; // chave entre aspas
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=5&q=${encodeURIComponent(query)}&key=${API_KEY}`;
 
     const resposta = await fetch(url);
-    const texto = await resposta.text(); // captura erro bruto
+    const texto = await resposta.text();
 
     if (!resposta.ok) {
       console.error("❌ Erro bruto da API YouTube:", texto);
@@ -45,6 +45,7 @@ export default async function handler(req) {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
+
   } catch (err) {
     console.error("❌ Erro interno:", err);
     return new Response(JSON.stringify({ error: 'Erro interno', detalhe: err.message }), {
