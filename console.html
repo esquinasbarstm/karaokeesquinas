@@ -67,25 +67,28 @@
       margin-left: 10px;
     }
   </style>
-  <!-- ✅ SortableJS para drag-and-drop -->
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </head>
 <body>
   <div class="container">
     <h1>🎤 Console do Karaokê</h1>
+
     <div class="section" id="tocandoAgora" style="background:#e3ffe6; border-left: 5px solid #28a745;">
       <h2>🎧 Tocando Agora</h2>
       <p id="infoTocando">Nenhuma música em reprodução.</p>
     </div>
+
     <div class="section" id="proximaMusica" style="background:#fff7e6; border-left: 5px solid #ffa500;">
       <h2>🔜 Próxima Música da Fila</h2>
       <p id="infoProxima">Carregando...</p>
     </div>
+
     <div class="section">
       <h2>🎶 Fila Atual</h2>
       <button id="limparFila" class="limpar">Limpar Fila</button>
       <ul id="fila"></ul>
     </div>
+
     <div class="section">
       <h2>📜 Histórico de Músicas Tocadas</h2>
       <ul id="historico"></ul>
@@ -212,41 +215,28 @@
           <span><strong>${item.musica}</strong> <span class="tag">Mesa ${item.mesaId}</span></span>
           <span>
             ${i === 0 ? `
-              <button class="tocar" onclick="forcarTocar('${item.mesaId}', '${item.musica}')">Tocar agora</button>
-              <button class="remover" onclick="pularMusica('${item.mesaId}', '${item.musica}')">Pular</button>
+              <button class="tocar" onclick="forcarTocar('${item.mesaId}', \`${item.musica}\`)">Tocar agora</button>
+              <button class="remover" onclick="pularMusica('${item.mesaId}', \`${item.musica}\`)">Pular</button>
             ` : `
-              <button class="remover" onclick="removerMusica('${item.mesaId}', '${item.musica}')">Remover</button>
+              <button class="remover" onclick="removerMusica('${item.mesaId}', \`${item.musica}\`)">Remover</button>
             `}
           </span>
         `;
         ulFila.appendChild(li);
       });
 
-      if (filaRodizio.length > 1) {
-        const proxima = filaRodizio[1];
-        infoProxima.innerHTML = `
-          <strong>${proxima.musica}</strong>
-          <span class="tag">Mesa ${proxima.mesaId}</span>
-        `;
-      } else {
-        infoProxima.textContent = "Nenhuma música após a atual.";
-      }
-
-      // Ativa drag-and-drop após renderização
-      new Sortable(ulFila, {
-        animation: 150,
-        onEnd: salvarOrdemManual
-      });
+      const proxima = filaRodizio[1];
+      infoProxima.innerHTML = proxima
+        ? `<strong>${proxima.musica}</strong> <span class="tag">Mesa ${proxima.mesaId}</span>`
+        : "Nenhuma música após a atual.";
     }
 
     async function salvarOrdemManual() {
       const novaOrdem = [];
-
       ulFila.querySelectorAll("li").forEach((li) => {
         const musica = li.querySelector("strong")?.textContent;
         const mesaSpan = li.querySelector(".tag")?.textContent;
         const mesaId = mesaSpan?.replace("Mesa ", "").trim();
-
         if (musica && mesaId) {
           novaOrdem.push({ mesaId, musica });
         }
