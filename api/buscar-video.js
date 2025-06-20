@@ -1,25 +1,57 @@
-export default async function handler(req, res) {
-  const query = req.query.q || req.query.musica;
+export const config = {
+  runtime: 'edge',
+};
 
-  if (!query) return res.status(400).json({ error: 'Consulta vazia' });
+export default async function handler(req) {
+  const { searchParams } = new URL(req.url);
+  const query = searchParams.get('q') || searchParams.get('musica');
 
-  const API_KEY = 'AIzaSyBzHqKTAFuemsQV95chHZ3MsfKReKP5Tdk'; // ← coloque sua chave aqui
+  if (!query) {
+    return new Response(JSON.stringify({ error: 'Consulta vazia' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
+  const API_KEY = 'AIzaSyBzHqKTAFuemsQV95chHZ3MsfKReKP5Tdk';
   const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=5&q=${encodeURIComponent(query)}&key=${API_KEY}`;
 
   try {
     const resposta = await fetch(url);
+    if (!resposta.ok) {
+      const erroTexto = await resposta.text();
+      console.error("Erro da API YouTube:", erroTexto);
+      return new Response(JSON.stringify({ error: 'Erro na API do YouTube' }), {
+        status: 502,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     const dados = await resposta.json();
-
     const video = dados.items.find(item => item.id.videoId);
-    if (!video) return res.status(404).json({ error: 'Nenhum vídeo encontrado' });
 
-    res.status(200).json({
-      youtubeId: video.id.videoId,
-      titulo: video.snippet.title
-    });
+    if (!video) {
+      return new Response(JSON.stringify({ error: 'Nenhum vídeo encontrado' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(
+      JSON.stringify({
+        youtubeId: video.id.videoId,
+        titulo: video.snippet.title,
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Erro interno ao buscar vídeo' });
+    console.error("Erro interno:", err);
+    return new Response(JSON.stringify({ error: 'Erro interno ao buscar vídeo' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }
