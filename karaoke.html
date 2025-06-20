@@ -6,16 +6,14 @@
   <title>Karaokê - Esquina's Bar</title>
   <style>
     body {
-      font-family: sans-serif;
+      font-family: 'Segoe UI', sans-serif;
       padding: 20px;
       background: #f2f2f2;
       display: flex;
       flex-direction: column;
       align-items: center;
     }
-
     h1 { margin-bottom: 20px; }
-
     input, button {
       padding: 12px;
       margin: 10px 0;
@@ -25,7 +23,6 @@
       border-radius: 8px;
       border: 1px solid #ccc;
     }
-
     button {
       background: #ff0080;
       color: white;
@@ -33,18 +30,13 @@
       font-weight: bold;
       cursor: pointer;
     }
-
-    button:hover {
-      opacity: 0.9;
-    }
-
+    button:hover { opacity: 0.9; }
     ul {
       list-style: none;
       padding: 0;
       max-width: 400px;
       width: 100%;
     }
-
     li {
       background: white;
       padding: 12px;
@@ -55,23 +47,22 @@
       justify-content: space-between;
       align-items: center;
     }
-
     .destaque {
-      background: #d7ffd9 !important;
+      background: #d1ffe8 !important;
+      font-weight: bold;
     }
-
     .remove {
-      background: red;
+      background: #dc3545;
       color: white;
       border: none;
       border-radius: 4px;
       padding: 5px 10px;
       cursor: pointer;
     }
-
     .mensagem {
       margin-top: 10px;
       font-weight: bold;
+      text-align: center;
     }
   </style>
 </head>
@@ -79,14 +70,14 @@
   <h1 id="titulo">Karaokê</h1>
 
   <input type="text" id="nomeInput" placeholder="Seu nome (opcional)" />
-  <input type="text" id="musicaInput" placeholder="Digite uma música (ex: Evidências Zezé Di Camargo)" />
+  <input type="text" id="musicaInput" placeholder="Digite a música (ex: Evidências Zezé Di Camargo)" />
   <button id="botaoAdicionar" onclick="adicionarMusica()">Adicionar à fila</button>
   <div class="mensagem" id="mensagem"></div>
 
   <h3>🎵 Suas músicas:</h3>
   <ul id="listaMusicas"></ul>
 
-  <h3>🎤 Fila de reprodução:</h3>
+  <h3>🎤 Fila de Reprodução:</h3>
   <ul id="filaReproducao"></ul>
 
   <script type="module">
@@ -116,46 +107,55 @@
     const mensagem = document.getElementById("mensagem");
     const botao = document.getElementById("botaoAdicionar");
 
-    document.addEventListener("DOMContentLoaded", () => {
-      document.getElementById("titulo").textContent = `Karaokê - Mesa ${mesa}`;
-      observarMusicas();
-      observarFila();
-    });
+    document.getElementById("titulo").textContent = `🎤 Karaokê - Mesa ${mesa}`;
+    observarMusicas();
+    observarFila();
 
     async function adicionarMusica() {
       const musicaInput = document.getElementById("musicaInput");
       const nomeInput = document.getElementById("nomeInput");
       let nomeMusica = musicaInput.value.trim();
-      const nomePessoa = nomeInput.value.trim();
+      const nomePessoa = nomeInput.value.trim() || "Cliente";
+
       mensagem.textContent = "";
-      mensagem.style.color = "green";
 
       if (!nomeMusica) {
-        mensagem.textContent = "Digite o nome da música.";
+        mensagem.textContent = "⚠️ Digite o nome da música.";
         mensagem.style.color = "red";
         return;
       }
 
-      if (!nomeMusica.toLowerCase().includes("karaoke")) {
+      if (!nomeMusica.toLowerCase().includes("karaok")) {
         nomeMusica += " karaoke";
       }
 
       botao.disabled = true;
-      botao.textContent = "Adicionando...";
+      botao.textContent = "🔄 Verificando...";
 
       try {
-        const res = await fetch(`/api/buscar-video?q=${encodeURIComponent(nomeMusica)}`);
-        if (!res.ok) throw new Error("API indisponível ou vídeo não encontrado");
-        const data = await res.json();
+        const mesaRef = doc(db, "mesas", mesa);
+        const docSnap = await getDoc(mesaRef);
+        const musicas = docSnap.exists() ? docSnap.data().musicas || [] : [];
 
-        if (!data.youtubeId) {
-          mensagem.textContent = "Música não encontrada. Tente outro nome.";
+        if (musicas.length >= 4) {
+          mensagem.textContent = "⚠️ Limite de 4 músicas por mesa atingido. Aguarde tocar uma.";
           mensagem.style.color = "red";
+          botao.disabled = false;
+          botao.textContent = "Adicionar à fila";
           return;
         }
 
-        const mesaRef = doc(db, "mesas", mesa);
-        const docSnap = await getDoc(mesaRef);
+        botao.textContent = "🎵 Buscando vídeo...";
+
+        const res = await fetch(`/api/buscar-video?q=${encodeURIComponent(nomeMusica)}`);
+        if (!res.ok) throw new Error("Erro ao buscar vídeo");
+        const data = await res.json();
+
+        if (!data.youtubeId) {
+          mensagem.textContent = "❌ Música não encontrada. Tente outro nome.";
+          mensagem.style.color = "red";
+          return;
+        }
 
         if (!docSnap.exists()) {
           await setDoc(mesaRef, {
@@ -173,19 +173,18 @@
           mesa: mesa,
           musica: data.titulo,
           youtubeId: data.youtubeId,
-          nome: nomePessoa || "Cliente",
+          nome: nomePessoa,
           timestamp: serverTimestamp()
         });
 
-        // 🔄 Dispara o recalcular da fila automaticamente
         await setDoc(doc(db, "sistema", "recalcularFila"), { atualizar: true });
 
         musicaInput.value = "";
-        mensagem.textContent = `🎶 Adicionada: ${data.titulo}`;
+        mensagem.textContent = `✅ Adicionada: ${data.titulo}`;
         mensagem.style.color = "green";
       } catch (error) {
         console.error(error);
-        mensagem.textContent = "Erro ao buscar vídeo. Verifique o nome ou tente mais tarde.";
+        mensagem.textContent = "⚠️ Erro ao buscar o vídeo. Tente novamente.";
         mensagem.style.color = "red";
       } finally {
         botao.disabled = false;
@@ -196,8 +195,7 @@
     function observarMusicas() {
       const mesaRef = doc(db, "mesas", mesa);
       onSnapshot(mesaRef, (docSnap) => {
-        const data = docSnap.data();
-        const musicas = data?.musicas || [];
+        const musicas = docSnap.data()?.musicas || [];
         renderizarLista(musicas);
       });
     }
@@ -216,7 +214,6 @@
         lista.innerHTML = "<li>Nenhuma música adicionada ainda.</li>";
         return;
       }
-
       musicas.forEach((musica) => {
         const li = document.createElement("li");
         li.innerHTML = `<span>${musica}</span> <button class="remove" onclick="removerMusica('${musica}')">Remover</button>`;
@@ -277,9 +274,7 @@
       filaFinal.forEach((item, index) => {
         const li = document.createElement("li");
         li.innerHTML = `<strong>${index + 1}.</strong> ${item.musica} <small>(${item.nome} - Mesa ${item.mesa})</small>`;
-        if (item.mesa === mesa) {
-          li.classList.add("destaque");
-        }
+        if (item.mesa === mesa) li.classList.add("destaque");
         filaLista.appendChild(li);
       });
     }
