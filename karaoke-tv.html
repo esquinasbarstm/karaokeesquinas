@@ -19,7 +19,6 @@
       align-items: center;
       justify-content: center;
     }
-
     #info {
       position: absolute;
       top: 20px;
@@ -29,7 +28,6 @@
       border-radius: 8px;
       font-size: 18px;
     }
-
     #proxima {
       position: absolute;
       bottom: 20px;
@@ -37,7 +35,6 @@
       font-size: 16px;
       color: gray;
     }
-
     #player {
       width: 100%;
       height: 100%;
@@ -102,11 +99,9 @@
 
     function onPlayerStateChange(event) {
       clearTimeout(musicaTimeout);
-
       if (event.data === YT.PlayerState.ENDED && currentDocId) {
         encerrarMusica(tocandoAgora?.mesa, tocandoAgora?.musica);
       }
-
       if (event.data === YT.PlayerState.PLAYING) {
         musicaTimeout = setTimeout(() => {
           console.warn("Vídeo travado? Pulando...");
@@ -137,7 +132,7 @@
         atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
       });
 
-      document.getElementById("info").textContent = 🎤 Mesa ${data.mesa} – ${data.musica};
+      document.getElementById("info").textContent = `🎤 Mesa ${data.mesa} – ${data.musica}`;
     }
 
     async function encerrarMusica(mesa, musica) {
@@ -148,7 +143,6 @@
             ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
           });
 
-          // ⚠️ Gatilho para console reorganizar a fila
           await db.collection("sistema").doc("recalcularFila").set({
             atualizar: true,
             atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
@@ -163,7 +157,7 @@
       }
     }
 
-    // ✅ Escuta a fila com rodízio
+    // Escuta a fila com rodízio
     db.collection("sistema").doc("filaOrdenada").onSnapshot((docSnap) => {
       const fila = docSnap.data()?.fila || [];
 
@@ -183,14 +177,13 @@
 
       tocarMusica(proxima);
 
-      // Atualiza preview da próxima
       const seguinte = fila[1];
       document.getElementById("proxima").textContent = seguinte
-        ? Próxima: Mesa ${seguinte.mesa} – ${seguinte.musica}
+        ? `Próxima: Mesa ${seguinte.mesa} – ${seguinte.musica}`
         : "Próxima: aguardando...";
     });
 
-    // ✅ Música forçada manualmente
+    // Música forçada manualmente
     db.collection("status").doc("forcarTocar").onSnapshot(async (docSnap) => {
       if (!docSnap.exists) return;
       const data = docSnap.data();
@@ -223,7 +216,7 @@
           atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        document.getElementById("info").textContent = 🎤 Mesa ${data.mesa} (Forçada) – ${data.musica};
+        document.getElementById("info").textContent = `🎤 Mesa ${data.mesa} (Forçada) – ${data.musica}`;
         document.getElementById("proxima").textContent = "Próxima: aguardando...";
       } catch (err) {
         console.error("Erro ao forçar música:", err);
