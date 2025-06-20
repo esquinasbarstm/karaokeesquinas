@@ -238,27 +238,32 @@
         : "Nenhuma música após a atual.";
     }
 
-    async function buscarYoutubeId(musica) {
-      try {
-        if (!musica || typeof musica !== "string") return null;
+async function buscarYoutubeId(musica) {
+  try {
+    if (!musica || typeof musica !== "string") return null;
 
-        const query = encodeURIComponent(
-          musica.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-        );
+    const textoLimpo = musica
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")          // remove acentos
+      .replace(/[^\w\s-]/gi, "")                // remove caracteres especiais
+      .replace(/\s+/g, " ")                     // remove espaços duplicados
+      .trim();
 
-        const response = await fetch(`/api/buscar-video?musica=${query}`);
-        if (!response.ok) {
-          console.warn(`❌ API erro ${response.status} para:`, musica);
-          return null;
-        }
+    const query = encodeURIComponent(textoLimpo);
 
-        const json = await response.json();
-        return json?.videoId?.length === 11 ? json.videoId : null;
-      } catch (err) {
-        console.error("Erro ao buscar YouTube ID:", err);
-        return null;
-      }
+    const response = await fetch(`/api/buscar-video?musica=${query}`);
+    if (!response.ok) {
+      console.warn(`❌ API erro ${response.status} para: "${textoLimpo}"`);
+      return null;
     }
+
+    const json = await response.json();
+    return json?.videoId?.length === 11 ? json.videoId : null;
+  } catch (err) {
+    console.error("Erro ao buscar YouTube ID:", err);
+    return null;
+  }
+}
 
     window.forcarTocar = async (mesaId, musica) => {
       const youtubeId = await buscarYoutubeId(musica);
