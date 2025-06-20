@@ -15,7 +15,7 @@ export default async function handler(req) {
     }
 
     const API_KEY = 'AIzaSyDsdUMRJMx6NIaylLQPMZKkye3-m8DQwH8';
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=5&q=${encodeURIComponent(query)}&key=${API_KEY}`;
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=5&q=${encodeURIComponent(query)}&key=${AIzaSyA3Lwmtd2Wn4rRF-xhLXIUhb-PjfFhMXxc}`;
 
     const resposta = await fetch(url);
     const texto = await resposta.text();
