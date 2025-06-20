@@ -14,7 +14,7 @@ export default async function handler(req) {
       });
     }
 
-    const API_KEY = 'SUA_CHAVE_AQUI';
+    const API_KEY = 'AIzaSyA3Lwmtd2Wn4rRF-xhLXIUhb-PjfFhMXxc';
     const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=5&q=${encodeURIComponent(query)}&key=${AIzaSyA3Lwmtd2Wn4rRF-xhLXIUhb-PjfFhMXxc}`;
 
     const resposta = await fetch(url);
