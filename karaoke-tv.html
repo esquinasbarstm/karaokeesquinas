@@ -41,7 +41,6 @@
   <div id="info">Aguardando próxima música...</div>
   <div id="player"></div>
 
-  <!-- Firebase + YouTube API -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="https://www.youtube.com/iframe_api"></script>
@@ -93,7 +92,7 @@
         const fila = docSnap.data()?.fila || [];
 
         if (!fila.length) {
-          document.getElementById("info").textContent = "Aguardando próxima música...";
+          document.getElementById("info").textContent = "🎤 Ninguém na fila. Adicione uma música!";
           return;
         }
 
@@ -125,7 +124,7 @@
         if (player && typeof player.loadVideoById === 'function') {
           player.loadVideoById(youtubeId);
         } else {
-          console.warn("⚠️ Player ainda não carregado (tocarProxima).");
+          console.warn("⚠️ Player ainda não carregado (tocarProxima). Retentando...");
           setTimeout(tocarProxima, 1000);
           return;
         }
@@ -138,6 +137,7 @@
         });
 
         document.getElementById("info").textContent = `🎤 Mesa ${proxima.mesaId} – ${proxima.musica}`;
+        console.log("🎬 Tocando agora:", tocandoAgora);
       } catch (e) {
         console.error("Erro ao buscar próxima música:", e);
       }
@@ -209,6 +209,8 @@
           youtubeId: data.youtubeId,
           atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
         });
+
+        forcarDataPendente = null;
       } else {
         console.warn("⚠️ Player ainda não carregado (forçada).");
         setTimeout(() => tocarForcada(data), 1000);
@@ -222,7 +224,13 @@
 
     db.collection("sistema").doc("filaOrdenada").onSnapshot(docSnap => {
       if (!docSnap.exists || !docSnap.data()?.fila?.length) return;
-      if (!tocandoAgora) tocarProxima();
+      if (!tocandoAgora && player && typeof player.loadVideoById === 'function') {
+        tocarProxima();
+      } else {
+        setTimeout(() => {
+          if (!tocandoAgora) tocarProxima();
+        }, 1000);
+      }
     });
   </script>
 </body>
