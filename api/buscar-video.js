@@ -18,10 +18,10 @@ export default async function handler(req) {
     const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=5&q=${encodeURIComponent(query)}&key=${API_KEY}`;
 
     const resposta = await fetch(url);
-    const texto = await resposta.text(); // <-- captura o erro bruto
+    const texto = await resposta.text();
 
     if (!resposta.ok) {
-      console.error("❌ Erro bruto da API do YouTube:", texto);
+      console.error("❌ Erro da API do YouTube:", texto);
       return new Response(texto, {
         status: 502,
         headers: { 'Content-Type': 'application/json' },
@@ -29,7 +29,13 @@ export default async function handler(req) {
     }
 
     const dados = JSON.parse(texto);
-    const video = dados.items.find(item => item.id?.videoId?.length === 11);
+
+    const video = dados.items.find(
+      item =>
+        item.id?.videoId?.length === 11 &&
+        !item.snippet.title.toLowerCase().includes("ao vivo") && // evita vídeos ao vivo
+        !item.snippet.title.toLowerCase().includes("podcast")    // evita podcasts
+    );
 
     if (!video) {
       return new Response(JSON.stringify({ error: 'Nenhum vídeo válido encontrado' }), {
