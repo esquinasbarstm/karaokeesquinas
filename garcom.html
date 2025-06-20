@@ -20,6 +20,7 @@
     .tocar { background: #28a745; color: white; margin-left: 10px; }
     #loginDiv { max-width: 400px; margin: 100px auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
     .tocando-agora { font-size: 18px; font-weight: bold; background: #ffeeba; padding: 10px; border-radius: 5px; margin-bottom: 20px; color: #856404; }
+    .ranking { background: #fff3cd; padding: 10px; border-radius: 5px; margin-top: 20px; }
   </style>
 </head>
 <body>
@@ -38,9 +39,6 @@
     <label for="musicaInput">Música:</label>
     <input type="text" id="musicaInput" placeholder="Digite o nome da música" />
 
-    <label for="linkInput">Link do YouTube (karaokê):</label>
-    <input type="text" id="linkInput" placeholder="https://www.youtube.com/watch?v=..." />
-
     <button onclick="adicionarMusica()">Adicionar à Mesa</button>
 
     <h2>Músicas da Mesa Selecionada</h2>
@@ -51,6 +49,9 @@
 
     <h2>Fila Global</h2>
     <ul id="filaGlobal"></ul>
+
+    <h2>🎵 Ranking de Músicas Mais Pedidas</h2>
+    <ul id="ranking" class="ranking"></ul>
   </div>
 
   <script type="module">
@@ -58,7 +59,7 @@
     import {
       getFirestore, collection, getDocs, doc, getDoc, setDoc,
       updateDoc, arrayUnion, arrayRemove, serverTimestamp,
-      onSnapshot, addDoc
+      onSnapshot, addDoc, increment
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -83,6 +84,7 @@
         document.getElementById("painel").style.display = "block";
         carregarMesas();
         observarFilaGlobal();
+        carregarRanking();
       } else {
         alert("Senha incorreta");
       }
@@ -100,19 +102,22 @@
       atualizarListaMesa();
     }
 
-    window.adicionarMusica = async function () {
+    async function adicionarMusica() {
       const mesa = document.getElementById("mesaSelect").value;
       const musica = document.getElementById("musicaInput").value.trim();
-      const link = document.getElementById("linkInput").value.trim();
 
-      if (!musica || !link) {
-        alert("Preencha todos os campos!");
+      if (!musica) {
+        alert("Digite o nome da música!");
         return;
       }
 
-      const youtubeId = extrairIdYoutube(link);
+      const query = `${musica} karaoke`;
+      const response = await fetch(`/api/buscar-video?q=${encodeURIComponent(query)}`);
+      const data = await response.json();
+      const youtubeId = data.youtubeId;
+
       if (!youtubeId) {
-        alert("Link do YouTube inválido!");
+        alert("Vídeo não encontrado!");
         return;
       }
 
@@ -121,32 +126,31 @@
 
       if (!docSnap.exists()) {
         await setDoc(mesaRef, {
-          musicas: [musica],
+          musicas: [data.titulo],
           ultimaAtualizacao: serverTimestamp()
         });
       } else {
         await updateDoc(mesaRef, {
-          musicas: arrayUnion(musica),
+          musicas: arrayUnion(data.titulo),
           ultimaAtualizacao: serverTimestamp()
         });
       }
 
-      // Adiciona na fila com o youtubeId
       await addDoc(collection(db, "fila"), {
         mesa: mesa,
-        musica: musica,
-        youtubeId: youtubeId,
+        musica: data.titulo,
+        youtubeId,
         timestamp: serverTimestamp()
       });
 
-      document.getElementById("musicaInput").value = "";
-      document.getElementById("linkInput").value = "";
-    };
+      await setDoc(doc(db, "sistema", "recalcularFila"), { atualizar: true });
 
-    function extrairIdYoutube(url) {
-      const regex = /(?:youtube\.com\/(?:.*v=|v\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-      const match = url.match(regex);
-      return match ? match[1] : null;
+      const musicaRankRef = doc(db, "ranking", data.titulo);
+      await updateDoc(musicaRankRef, { contagem: increment(1) }).catch(async () => {
+        await setDoc(musicaRankRef, { contagem: 1 });
+      });
+
+      document.getElementById("musicaInput").value = "";
     }
 
     async function atualizarListaMesa() {
@@ -219,8 +223,8 @@
 
     window.tocarMusica = async function (mesa, musica) {
       await addDoc(collection(db, "historico"), {
-        mesa: mesa,
-        musica: musica,
+        mesa,
+        musica,
         tocadaEm: serverTimestamp()
       });
       await updateDoc(doc(db, "mesas", mesa), {
@@ -228,6 +232,27 @@
         ultimaAtualizacao: serverTimestamp()
       });
     };
+
+    async function carregarRanking() {
+      const rankingRef = collection(db, "ranking");
+      const snapshot = await getDocs(rankingRef);
+      const lista = [];
+
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        lista.push({ musica: doc.id, contagem: data.contagem || 0 });
+      });
+
+      lista.sort((a, b) => b.contagem - a.contagem);
+      const ul = document.getElementById("ranking");
+      ul.innerHTML = "";
+
+      lista.slice(0, 10).forEach((item, i) => {
+        const li = document.createElement("li");
+        li.innerHTML = `#${i + 1} - ${item.musica} (${item.contagem}x)`;
+        ul.appendChild(li);
+      });
+    }
   </script>
 </body>
 </html>
