@@ -122,6 +122,55 @@
     let mesas = [];
     let filaRodizio = [];
 
+    async function buscarYoutubeId(musica) {
+      try {
+        const query = encodeURIComponent(musica);
+        const response = await fetch(`/api/buscar-video?musica=${query}`);
+        const json = await response.json();
+        return json?.videoId || null;
+      } catch (err) {
+        console.error("Erro ao buscar YouTube ID:", err);
+        return null;
+      }
+    }
+
+    window.forcarTocar = async (mesaId, musica) => {
+      const youtubeId = await buscarYoutubeId(musica);
+      if (!youtubeId) return;
+
+      await setDoc(doc(db, "status", "forcarTocar"), {
+        mesa: mesaId,
+        musica,
+        youtubeId,
+        forcarEm: serverTimestamp()
+      });
+    };
+
+    window.pularMusica = async (mesaId, musica) => {
+      await removerMusica(mesaId, musica);
+    };
+
+    window.removerMusica = async (mesaId, musica) => {
+      const mesaRef = doc(db, "mesas", mesaId);
+      await updateDoc(mesaRef, {
+        musicas: arrayRemove(musica),
+        ultimaAtualizacao: serverTimestamp()
+      });
+      await gerarFilaRodizio();
+    };
+
+    async function limparFila() {
+      const snapshot = await getDocs(collection(db, "mesas"));
+      for (let docSnap of snapshot.docs) {
+        const mesaRef = doc(db, "mesas", docSnap.id);
+        await updateDoc(mesaRef, {
+          musicas: [],
+          ultimaAtualizacao: serverTimestamp()
+        });
+      }
+      await gerarFilaRodizio();
+    }
+
     document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("limparFila").addEventListener("click", limparFila);
 
@@ -129,7 +178,6 @@
 
       onSnapshot(doc(db, "sistema", "recalcularFila"), async (docSnap) => {
         if (docSnap.exists()) {
-          console.log("🔄 Recalculando fila após trigger...");
           await gerarFilaRodizio();
           await setDoc(doc(db, "sistema", "recalcularFila"), { atualizar: false });
         }
@@ -155,11 +203,7 @@
 
         const data = docSnap.data();
         const time = data.atualizadoEm?.toDate().toLocaleTimeString("pt-BR") || "";
-        infoTocando.innerHTML = `
-          <strong>${data.musica}</strong>
-          <span class="tag">Mesa ${data.mesa}</span>
-          <span class="time">${time}</span>
-        `;
+        infoTocando.innerHTML = `<strong>${data.musica}</strong> <span class="tag">Mesa ${data.mesa}</span><span class="time">${time}</span>`;
       });
     });
 
@@ -181,19 +225,13 @@
           const segunda = mesa.musicas[index + 1];
 
           if (typeof primeira === 'string') {
-            const youtubeId = await buscarYoutubeId(primeira);
-            if (youtubeId) {
-              filaRodizio.push({ mesaId: mesa.mesaId, musica: primeira, youtubeId });
-              aindaTem = true;
-            }
+            filaRodizio.push({ mesaId: mesa.mesaId, musica: primeira });
+            aindaTem = true;
           }
 
           if (typeof segunda === 'string') {
-            const youtubeId2 = await buscarYoutubeId(segunda);
-            if (youtubeId2) {
-              filaRodizio.push({ mesaId: mesa.mesaId, musica: segunda, youtubeId: youtubeId2 });
-              aindaTem = true;
-            }
+            filaRodizio.push({ mesaId: mesa.mesaId, musica: segunda });
+            aindaTem = true;
           }
         }
         index += 2;
@@ -236,70 +274,6 @@
       infoProxima.innerHTML = proxima
         ? `<strong>${proxima.musica}</strong> <span class="tag">Mesa ${proxima.mesaId}</span>`
         : "Nenhuma música após a atual.";
-    }
-
-async function buscarYoutubeId(musica) {
-  try {
-    if (!musica || typeof musica !== "string") return null;
-
-    const textoLimpo = musica
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")          // remove acentos
-      .replace(/[^\w\s-]/gi, "")                // remove caracteres especiais
-      .replace(/\s+/g, " ")                     // remove espaços duplicados
-      .trim();
-
-    const query = encodeURIComponent(textoLimpo);
-
-    const response = await fetch(`/api/buscar-video?musica=${query}`);
-    if (!response.ok) {
-      console.warn(`❌ API erro ${response.status} para: "${textoLimpo}"`);
-      return null;
-    }
-
-    const json = await response.json();
-    return json?.videoId?.length === 11 ? json.videoId : null;
-  } catch (err) {
-    console.error("Erro ao buscar YouTube ID:", err);
-    return null;
-  }
-}
-
-    window.forcarTocar = async (mesaId, musica) => {
-      const youtubeId = await buscarYoutubeId(musica);
-      if (!youtubeId) return;
-
-      await setDoc(doc(db, "status", "forcarTocar"), {
-        mesa: mesaId,
-        musica,
-        youtubeId,
-        forcarEm: serverTimestamp()
-      });
-    };
-
-    window.pularMusica = async (mesaId, musica) => {
-      await removerMusica(mesaId, musica);
-    };
-
-    window.removerMusica = async (mesaId, musica) => {
-      const mesaRef = doc(db, "mesas", mesaId);
-      await updateDoc(mesaRef, {
-        musicas: arrayRemove(musica),
-        ultimaAtualizacao: serverTimestamp()
-      });
-      await gerarFilaRodizio();
-    };
-
-    async function limparFila() {
-      const snapshot = await getDocs(collection(db, "mesas"));
-      for (let docSnap of snapshot.docs) {
-        const mesaRef = doc(db, "mesas", docSnap.id);
-        await updateDoc(mesaRef, {
-          musicas: [],
-          ultimaAtualizacao: serverTimestamp()
-        });
-      }
-      await gerarFilaRodizio();
     }
   </script>
 </body>
