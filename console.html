@@ -67,7 +67,6 @@
       margin-left: 10px;
     }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -99,7 +98,8 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import {
       getFirestore, collection, doc, getDocs, onSnapshot,
-      updateDoc, arrayRemove, serverTimestamp, query, orderBy, setDoc
+      updateDoc, arrayRemove, serverTimestamp,
+      query, orderBy, setDoc
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -120,68 +120,12 @@
     const infoProxima = document.getElementById("infoProxima");
 
     let mesas = [];
-    let filaRodizio = [];
-
-    async function buscarYoutubeId(musica) {
-      try {
-        const query = encodeURIComponent(musica);
-        const response = await fetch(`/api/buscar-video?musica=${query}`);
-        const json = await response.json();
-        return json?.videoId || null;
-      } catch (err) {
-        console.error("Erro ao buscar YouTube ID:", err);
-        return null;
-      }
-    }
-
-    window.forcarTocar = async (mesaId, musica) => {
-      const youtubeId = await buscarYoutubeId(musica);
-      if (!youtubeId) return;
-
-      await setDoc(doc(db, "status", "forcarTocar"), {
-        mesa: mesaId,
-        musica,
-        youtubeId,
-        forcarEm: serverTimestamp()
-      });
-    };
-
-    window.pularMusica = async (mesaId, musica) => {
-      await removerMusica(mesaId, musica);
-    };
-
-    window.removerMusica = async (mesaId, musica) => {
-      const mesaRef = doc(db, "mesas", mesaId);
-      await updateDoc(mesaRef, {
-        musicas: arrayRemove(musica),
-        ultimaAtualizacao: serverTimestamp()
-      });
-      await gerarFilaRodizio();
-    };
-
-    async function limparFila() {
-      const snapshot = await getDocs(collection(db, "mesas"));
-      for (let docSnap of snapshot.docs) {
-        const mesaRef = doc(db, "mesas", docSnap.id);
-        await updateDoc(mesaRef, {
-          musicas: [],
-          ultimaAtualizacao: serverTimestamp()
-        });
-      }
-      await gerarFilaRodizio();
-    }
+    let filaAtual = [];
 
     document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("limparFila").addEventListener("click", limparFila);
 
-      onSnapshot(collection(db, "mesas"), gerarFilaRodizio);
-
-      onSnapshot(doc(db, "sistema", "recalcularFila"), async (docSnap) => {
-        if (docSnap.exists()) {
-          await gerarFilaRodizio();
-          await setDoc(doc(db, "sistema", "recalcularFila"), { atualizar: false });
-        }
-      });
+      onSnapshot(collection(db, "mesas"), gerarFila);
 
       const qHist = query(collection(db, "historico"), orderBy("tocadaEm", "desc"));
       onSnapshot(qHist, (snapshot) => {
@@ -203,77 +147,126 @@
 
         const data = docSnap.data();
         const time = data.atualizadoEm?.toDate().toLocaleTimeString("pt-BR") || "";
-        infoTocando.innerHTML = `<strong>${data.musica}</strong> <span class="tag">Mesa ${data.mesa}</span><span class="time">${time}</span>`;
+        infoTocando.innerHTML = `
+          <strong>${data.musica}</strong>
+          <span class="tag">Mesa ${data.mesa}</span>
+          <span class="time">${time}</span>
+        `;
       });
     });
 
-    async function gerarFilaRodizio() {
+    async function gerarFila() {
       const snapshot = await getDocs(collection(db, "mesas"));
       mesas = snapshot.docs.map(doc => ({
         mesaId: doc.id,
         musicas: doc.data().musicas || []
       }));
+      montarFilaRodizio();
+    }
 
-      filaRodizio = [];
+    function montarFilaRodizio() {
+      filaAtual = [];
       let index = 0;
       let aindaTem = true;
 
       while (aindaTem) {
         aindaTem = false;
         for (let mesa of mesas) {
-          const primeira = mesa.musicas[index];
-          const segunda = mesa.musicas[index + 1];
-
-          if (typeof primeira === 'string') {
-            filaRodizio.push({ mesaId: mesa.mesaId, musica: primeira });
-            aindaTem = true;
-          }
-
-          if (typeof segunda === 'string') {
-            filaRodizio.push({ mesaId: mesa.mesaId, musica: segunda });
+          if (mesa.musicas.length > index) {
+            filaAtual.push({ mesaId: mesa.mesaId, musica: mesa.musicas[index] });
             aindaTem = true;
           }
         }
-        index += 2;
+        index++;
       }
-
-      await setDoc(doc(db, "sistema", "filaOrdenada"), {
-        fila: filaRodizio,
-        atualizadaEm: serverTimestamp()
-      });
 
       renderizarFila();
     }
 
     function renderizarFila() {
       ulFila.innerHTML = '';
-      if (filaRodizio.length === 0) {
+      if (filaAtual.length === 0) {
         ulFila.innerHTML = '<li>Nenhuma música na fila.</li>';
         infoProxima.textContent = "Nenhuma música após a atual.";
         return;
       }
 
-      filaRodizio.forEach((item, i) => {
+      filaAtual.forEach((item, i) => {
         const li = document.createElement("li");
         if (i === 0) li.classList.add("atual");
         li.innerHTML = `
           <span><strong>${item.musica}</strong> <span class="tag">Mesa ${item.mesaId}</span></span>
           <span>
             ${i === 0 ? `
-              <button class="tocar" onclick="forcarTocar('${item.mesaId}', \`${item.musica}\`)">Tocar agora</button>
-              <button class="remover" onclick="pularMusica('${item.mesaId}', \`${item.musica}\`)">Pular</button>
+              <button class="tocar" onclick="forcarTocar('${item.mesaId}', '${item.musica}')">Tocar agora</button>
+              <button class="remover" onclick="pularMusica('${item.mesaId}', '${item.musica}')">Pular</button>
             ` : `
-              <button class="remover" onclick="removerMusica('${item.mesaId}', \`${item.musica}\`)">Remover</button>
+              <button class="remover" onclick="removerMusica('${item.mesaId}', '${item.musica}')">Remover</button>
             `}
           </span>
         `;
         ulFila.appendChild(li);
       });
 
-      const proxima = filaRodizio[1];
-      infoProxima.innerHTML = proxima
-        ? `<strong>${proxima.musica}</strong> <span class="tag">Mesa ${proxima.mesaId}</span>`
-        : "Nenhuma música após a atual.";
+      if (filaAtual.length > 1) {
+        const proxima = filaAtual[1];
+        infoProxima.innerHTML = `
+          <strong>${proxima.musica}</strong>
+          <span class="tag">Mesa ${proxima.mesaId}</span>
+        `;
+      } else {
+        infoProxima.textContent = "Nenhuma música após a atual.";
+      }
+    }
+
+    window.forcarTocar = async (mesaId, musica) => {
+      const mesaSnap = await getDocs(doc(db, "mesas", mesaId));
+      const musicas = mesaSnap.data()?.musicas || [];
+
+      const youtubeId = await buscarYoutubeId(mesaId, musica);
+
+      if (!youtubeId) return;
+
+      await setDoc(doc(db, "status", "forcarTocar"), {
+        mesa: mesaId,
+        musica: musica,
+        youtubeId,
+        forcarEm: serverTimestamp()
+      });
+    };
+
+    async function buscarYoutubeId(mesaId, musica) {
+      try {
+        const response = await fetch(`/api/buscar-video?musica=${encodeURIComponent(musica)}`);
+        const json = await response.json();
+        return json?.videoId || null;
+      } catch (err) {
+        console.error("Erro ao buscar YouTube ID:", err);
+        return null;
+      }
+    }
+
+    window.pularMusica = async (mesaId, musica) => {
+      await removerMusica(mesaId, musica);
+    };
+
+    window.removerMusica = async (mesaId, musica) => {
+      const mesaRef = doc(db, "mesas", mesaId);
+      await updateDoc(mesaRef, {
+        musicas: arrayRemove(musica),
+        ultimaAtualizacao: serverTimestamp()
+      });
+    };
+
+    async function limparFila() {
+      const snapshot = await getDocs(collection(db, "mesas"));
+      snapshot.forEach(async (docSnap) => {
+        const mesaRef = doc(db, "mesas", docSnap.id);
+        await updateDoc(mesaRef, {
+          musicas: [],
+          ultimaAtualizacao: serverTimestamp()
+        });
+      });
     }
   </script>
 </body>
