@@ -29,7 +29,7 @@ export default async function handler(req) {
     }
 
     const dados = JSON.parse(texto);
-    const video = dados.items?.find(item => item.id?.videoId);
+    const video = dados.items.find(item => item.id?.videoId?.length === 11);
 
     if (!video) {
       return new Response(JSON.stringify({ error: 'Nenhum vídeo válido encontrado' }), {
