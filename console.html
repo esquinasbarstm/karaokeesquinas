@@ -182,14 +182,18 @@
 
           if (typeof primeira === 'string') {
             const youtubeId = await buscarYoutubeId(primeira);
-            filaRodizio.push({ mesaId: mesa.mesaId, musica: primeira, youtubeId });
-            aindaTem = true;
+            if (youtubeId) {
+              filaRodizio.push({ mesaId: mesa.mesaId, musica: primeira, youtubeId });
+              aindaTem = true;
+            }
           }
 
           if (typeof segunda === 'string') {
-            const youtubeId = await buscarYoutubeId(segunda);
-            filaRodizio.push({ mesaId: mesa.mesaId, musica: segunda, youtubeId });
-            aindaTem = true;
+            const youtubeId2 = await buscarYoutubeId(segunda);
+            if (youtubeId2) {
+              filaRodizio.push({ mesaId: mesa.mesaId, musica: segunda, youtubeId: youtubeId2 });
+              aindaTem = true;
+            }
           }
         }
         index += 2;
@@ -236,32 +240,24 @@
 
     async function buscarYoutubeId(musica) {
       try {
-        const response = await fetch(`/api/buscar-video?musica=${encodeURIComponent(musica)}`);
+        if (!musica || typeof musica !== "string") return null;
+
+        const query = encodeURIComponent(
+          musica.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        );
+
+        const response = await fetch(`/api/buscar-video?musica=${query}`);
+        if (!response.ok) {
+          console.warn(`❌ API erro ${response.status} para:`, musica);
+          return null;
+        }
+
         const json = await response.json();
-        return json?.videoId || null;
+        return json?.videoId?.length === 11 ? json.videoId : null;
       } catch (err) {
         console.error("Erro ao buscar YouTube ID:", err);
         return null;
       }
-    }
-
-    async function salvarOrdemManual() {
-      const novaOrdem = [];
-      ulFila.querySelectorAll("li").forEach((li) => {
-        const musica = li.querySelector("strong")?.textContent;
-        const mesaSpan = li.querySelector(".tag")?.textContent;
-        const mesaId = mesaSpan?.replace("Mesa ", "").trim();
-        if (musica && mesaId) {
-          novaOrdem.push({ mesaId, musica });
-        }
-      });
-
-      await setDoc(doc(db, "sistema", "filaOrdenada"), {
-        fila: novaOrdem,
-        atualizadaEm: serverTimestamp()
-      });
-
-      console.log("🎯 Nova ordem manual salva:", novaOrdem);
     }
 
     window.forcarTocar = async (mesaId, musica) => {
