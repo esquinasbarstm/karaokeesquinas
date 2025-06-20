@@ -181,11 +181,14 @@
           const segunda = mesa.musicas[index + 1];
 
           if (typeof primeira === 'string') {
-            filaRodizio.push({ mesaId: mesa.mesaId, musica: primeira });
+            const youtubeId = await buscarYoutubeId(primeira);
+            filaRodizio.push({ mesaId: mesa.mesaId, musica: primeira, youtubeId });
             aindaTem = true;
           }
+
           if (typeof segunda === 'string') {
-            filaRodizio.push({ mesaId: mesa.mesaId, musica: segunda });
+            const youtubeId = await buscarYoutubeId(segunda);
+            filaRodizio.push({ mesaId: mesa.mesaId, musica: segunda, youtubeId });
             aindaTem = true;
           }
         }
@@ -231,6 +234,17 @@
         : "Nenhuma música após a atual.";
     }
 
+    async function buscarYoutubeId(musica) {
+      try {
+        const response = await fetch(`/api/buscar-video?musica=${encodeURIComponent(musica)}`);
+        const json = await response.json();
+        return json?.videoId || null;
+      } catch (err) {
+        console.error("Erro ao buscar YouTube ID:", err);
+        return null;
+      }
+    }
+
     async function salvarOrdemManual() {
       const novaOrdem = [];
       ulFila.querySelectorAll("li").forEach((li) => {
@@ -261,17 +275,6 @@
         forcarEm: serverTimestamp()
       });
     };
-
-    async function buscarYoutubeId(musica) {
-      try {
-        const response = await fetch(`/api/buscar-video?musica=${encodeURIComponent(musica)}`);
-        const json = await response.json();
-        return json?.videoId || null;
-      } catch (err) {
-        console.error("Erro ao buscar YouTube ID:", err);
-        return null;
-      }
-    }
 
     window.pularMusica = async (mesaId, musica) => {
       await removerMusica(mesaId, musica);
