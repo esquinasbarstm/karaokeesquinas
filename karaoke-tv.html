@@ -19,7 +19,6 @@
       align-items: center;
       justify-content: center;
     }
-
     #info {
       position: absolute;
       top: 20px;
@@ -29,13 +28,11 @@
       border-radius: 8px;
       font-size: 18px;
     }
-
     #player {
       width: 100%;
       height: 100%;
       max-height: 100vh;
     }
-
     #botaoFila {
       position: absolute;
       bottom: 20px;
@@ -48,7 +45,6 @@
       font-weight: bold;
       cursor: pointer;
     }
-
     #painelFila {
       position: absolute;
       right: 20px;
@@ -61,14 +57,12 @@
       width: 300px;
       display: none;
     }
-
     #painelFila h3 {
       margin-top: 0;
       margin-bottom: 10px;
       font-size: 18px;
       color: #fff;
     }
-
     .item-fila {
       display: flex;
       justify-content: space-between;
@@ -78,11 +72,9 @@
       background: #1e1e1e;
       border-radius: 6px;
     }
-
     .item-fila span {
       font-size: 14px;
     }
-
     .item-fila button {
       background: #28a745;
       color: white;
@@ -97,16 +89,13 @@
 <body>
   <div id="info">Aguardando próxima música...</div>
   <div id="player"></div>
-
   <button id="botaoFila">🎵 Ver Fila</button>
   <div id="painelFila">
     <h3>🎶 Fila Atual</h3>
     <div id="listaFila"></div>
   </div>
-
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyBGkT5z6i3KycQHvuutOYiUOeX1hDG15lw",
@@ -116,7 +105,6 @@
       messagingSenderId: "259976490299",
       appId: "1:259976490299:web:a7964bf79f1ead7e5e5b1e"
     };
-
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
@@ -125,18 +113,12 @@
     let tocandoAgora = null;
     let musicaTimeout = null;
 
-    window.onYouTubeIframeAPIReady = () => {
+    function onYouTubeIframeAPIReady() {
       player = new YT.Player('player', {
         height: '100%',
         width: '100%',
         videoId: '',
-        playerVars: {
-          autoplay: 1,
-          controls: 1,
-          rel: 0,
-          modestbranding: 1,
-          origin: window.location.origin
-        },
+        playerVars: { autoplay: 1, controls: 1, rel: 0, modestbranding: 1 },
         events: {
           onReady: () => {
             playerPronto = true;
@@ -146,10 +128,10 @@
           onStateChange: onPlayerStateChange
         }
       });
-    };
+    }
+    window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
 
-    function onPlayerError(event) {
-      console.error("Erro ao carregar vídeo:", event.data);
+    function onPlayerError() {
       document.getElementById("info").textContent = "Erro ao carregar vídeo. Pulando...";
       encerrarMusica();
     }
@@ -163,101 +145,62 @@
     }
 
     async function tocarProxima() {
-      try {
-        const filaDoc = await db.collection("sistema").doc("filaOrdenada").get();
-        const fila = filaDoc.data()?.fila || [];
-
-        if (!fila.length) {
-          document.getElementById("info").textContent = "🎤 Ninguém na fila. Adicione uma música!";
-          return;
-        }
-
-        const proxima = fila[0];
-        if (!proxima || (tocandoAgora?.mesa === proxima.mesaId && tocandoAgora?.musica === proxima.musica)) return;
-
-        const musicaSnap = await db.collection("fila")
-          .where("mesa", "==", proxima.mesaId)
-          .where("musica", "==", proxima.musica)
-          .limit(1)
-          .get();
-
-        if (musicaSnap.empty) return;
-
-        const data = musicaSnap.docs[0].data();
-        const youtubeId = data.youtubeId;
-
-        if (!youtubeId || youtubeId.length !== 11) {
-          console.warn("ID de vídeo inválido:", youtubeId);
-          return;
-        }
-
-        tocandoAgora = { mesa: proxima.mesaId, musica: proxima.musica };
-        player.loadVideoById(youtubeId);
-
-        await db.collection("status").doc("tocandoAgora").set({
-          mesa: proxima.mesaId,
-          musica: proxima.musica,
-          youtubeId,
-          atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
-        });
-
-        document.getElementById("info").textContent = `🎤 Mesa ${proxima.mesaId} – ${proxima.musica}`;
-      } catch (e) {
-        console.error("Erro ao tocar próxima música:", e);
+      const docSnap = await db.collection("sistema").doc("filaOrdenada").get();
+      const fila = docSnap.data()?.fila || [];
+      if (!fila.length) {
+        document.getElementById("info").textContent = "🎤 Ninguém na fila. Adicione uma música!";
+        return;
       }
+      const proxima = fila[0];
+      const snap = await db.collection("fila")
+        .where("mesa", "==", proxima.mesaId)
+        .where("musica", "==", proxima.musica)
+        .limit(1).get();
+      if (snap.empty) return;
+      const data = snap.docs[0].data();
+      if (!data.youtubeId || data.youtubeId.length !== 11) return;
+
+      tocandoAgora = { mesa: proxima.mesaId, musica: proxima.musica };
+      player.loadVideoById(data.youtubeId);
+      db.collection("status").doc("tocandoAgora").set({
+        mesa: proxima.mesaId,
+        musica: proxima.musica,
+        youtubeId: data.youtubeId,
+        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      document.getElementById("info").textContent = `🎤 Mesa ${proxima.mesaId} – ${proxima.musica}`;
     }
 
     async function encerrarMusica() {
-      try {
-        if (!tocandoAgora) return;
-
-        const snapshot = await db.collection("fila")
-          .where("mesa", "==", tocandoAgora.mesa)
-          .where("musica", "==", tocandoAgora.musica)
-          .get();
-
-        for (const doc of snapshot.docs) {
-          await doc.ref.delete();
-        }
-
-        await db.collection("mesas").doc(tocandoAgora.mesa).update({
-          musicas: firebase.firestore.FieldValue.arrayRemove(tocandoAgora.musica),
-          ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
-        });
-
-        const filaDoc = await db.collection("sistema").doc("filaOrdenada").get();
-        const novaFila = (filaDoc.data()?.fila || []).filter(item =>
-          item.mesaId !== tocandoAgora.mesa || item.musica !== tocandoAgora.musica
-        );
-
-        await db.collection("sistema").doc("filaOrdenada").set({
-          fila: novaFila,
-          atualizadaEm: firebase.firestore.FieldValue.serverTimestamp()
-        });
-      } catch (e) {
-        console.error("Erro ao encerrar música:", e);
-      } finally {
-        tocandoAgora = null;
-        document.getElementById("info").textContent = "Aguardando próxima música...";
-        if (playerPronto) tocarProxima();
-      }
+      if (!tocandoAgora) return;
+      const snap = await db.collection("fila")
+        .where("mesa", "==", tocandoAgora.mesa)
+        .where("musica", "==", tocandoAgora.musica).get();
+      for (const doc of snap.docs) await doc.ref.delete();
+      await db.collection("mesas").doc(tocandoAgora.mesa).update({
+        musicas: firebase.firestore.FieldValue.arrayRemove(tocandoAgora.musica),
+        ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      const filaDoc = await db.collection("sistema").doc("filaOrdenada").get();
+      const novaFila = (filaDoc.data()?.fila || []).filter(item =>
+        item.mesaId !== tocandoAgora.mesa || item.musica !== tocandoAgora.musica
+      );
+      await db.collection("sistema").doc("filaOrdenada").set({
+        fila: novaFila,
+        atualizadaEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      tocandoAgora = null;
+      document.getElementById("info").textContent = "Aguardando próxima música...";
+      if (playerPronto) tocarProxima();
     }
 
     db.collection("status").doc("forcarTocar").onSnapshot(docSnap => {
       const data = docSnap.data();
       if (!data || !data.youtubeId || data.youtubeId.length !== 11) return;
-      if (!playerPronto) {
-        setTimeout(() => tocarForcada(data), 500);
-        return;
-      }
-      tocarForcada(data);
-    });
-
-    function tocarForcada(data) {
       tocandoAgora = { mesa: data.mesa, musica: data.musica };
       player.loadVideoById(data.youtubeId);
       document.getElementById("info").textContent = `🎤 Mesa ${data.mesa} (Forçada) – ${data.musica}`;
-    }
+    });
 
     db.collection("sistema").doc("filaOrdenada").onSnapshot(doc => {
       const fila = doc.data()?.fila || [];
@@ -267,6 +210,7 @@
 
     function renderizarMiniFila(fila) {
       const container = document.getElementById("listaFila");
+      if (!container) return;
       container.innerHTML = "";
       fila.slice(0, 10).forEach(item => {
         const div = document.createElement("div");
@@ -282,31 +226,15 @@
     async function tocarAgoraMini(mesaId, musica) {
       const snap = await db.collection("fila")
         .where("mesa", "==", mesaId)
-        .where("musica", "==", musica)
-        .limit(1).get();
-
+        .where("musica", "==", musica).limit(1).get();
       if (snap.empty) return alert("Música não encontrada.");
-
       const data = snap.docs[0].data();
-      const youtubeId = data.youtubeId;
-      if (!youtubeId || youtubeId.length !== 11) return alert("ID de vídeo inválido.");
-
+      if (!data.youtubeId || data.youtubeId.length !== 11) return alert("ID de vídeo inválido.");
       await db.collection("status").doc("forcarTocar").set({
         mesa: mesaId,
         musica,
-        youtubeId,
+        youtubeId: data.youtubeId,
         forcarEm: firebase.firestore.FieldValue.serverTimestamp()
-      });
-
-      const filaAtual = (await db.collection("sistema").doc("filaOrdenada").get()).data()?.fila || [];
-      const novaFila = [
-        { mesaId, musica },
-        ...filaAtual.filter(f => f.mesaId !== mesaId || f.musica !== musica)
-      ];
-
-      await db.collection("sistema").doc("filaOrdenada").set({
-        fila: novaFila,
-        atualizadaEm: firebase.firestore.FieldValue.serverTimestamp()
       });
     }
 
