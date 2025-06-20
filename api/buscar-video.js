@@ -3,7 +3,7 @@ export default async function handler(req, res) {
 
   if (!query) return res.status(400).json({ error: 'Consulta vazia' });
 
-  const API_KEY = 'SUA_CHAVE_YOUTUBE_API'; // ← coloque sua chave aqui
+  const API_KEY = 'AIzaSyBzHqKTAFuemsQV95chHZ3MsfKReKP5Tdk'; // ← coloque sua chave aqui
 
   const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=5&q=${encodeURIComponent(query)}&key=${API_KEY}`;
 
