@@ -124,95 +124,29 @@
     let playerPronto = false;
     let tocandoAgora = null;
     let musicaTimeout = null;
-    let forcarDataPendente = null;
 
-    function renderizarMiniFila(fila) {
-      const container = document.getElementById("listaFila");
-      container.innerHTML = "";
-      fila.slice(0, 10).forEach(item => {
-        const div = document.createElement("div");
-        div.className = "item-fila";
-        div.innerHTML = `
-          <span>${item.musica} <small>(Mesa ${item.mesaId})</small></span>
-          <button onclick="tocarAgoraMini('${item.mesaId}', \`${item.musica}\`)">▶</button>
-        `;
-        container.appendChild(div);
-      });
-    }
-
-    async function tocarAgoraMini(mesaId, musica) {
-      const snap = await db.collection("fila")
-        .where("mesa", "==", mesaId)
-        .where("musica", "==", musica)
-        .limit(1).get();
-
-      if (snap.empty) return alert("Música não encontrada.");
-
-      const data = snap.docs[0].data();
-      if (!data.youtubeId || data.youtubeId.length !== 11) return alert("ID de vídeo inválido.");
-
-      await db.collection("status").doc("forcarTocar").set({
-        mesa: mesaId,
-        musica,
-        youtubeId: data.youtubeId,
-        forcarEm: firebase.firestore.FieldValue.serverTimestamp()
-      });
-
-      const docSnap = await db.collection("sistema").doc("filaOrdenada").get();
-      const filaAtual = docSnap.data()?.fila || [];
-      const novaFila = [
-        { mesaId, musica },
-        ...filaAtual.filter(f => f.musica !== musica || f.mesaId !== mesaId)
-      ];
-
-      await db.collection("sistema").doc("filaOrdenada").set({
-        fila: novaFila,
-        atualizadaEm: firebase.firestore.FieldValue.serverTimestamp()
-      });
-    }
-
-    async function tocarProxima() {
-      try {
-        const docSnap = await db.collection("sistema").doc("filaOrdenada").get();
-        const fila = docSnap.data()?.fila || [];
-
-        if (!fila.length) {
-          document.getElementById("info").textContent = "🎤 Ninguém na fila. Adicione uma música!";
-          return;
+    window.onYouTubeIframeAPIReady = () => {
+      player = new YT.Player('player', {
+        height: '100%',
+        width: '100%',
+        videoId: '',
+        playerVars: {
+          autoplay: 1,
+          controls: 1,
+          rel: 0,
+          modestbranding: 1,
+          origin: window.location.origin
+        },
+        events: {
+          onReady: () => {
+            playerPronto = true;
+            tocarProxima();
+          },
+          onError: onPlayerError,
+          onStateChange: onPlayerStateChange
         }
-
-        const proxima = fila[0];
-        if (!proxima || (tocandoAgora?.mesa === proxima.mesaId && tocandoAgora?.musica === proxima.musica)) return;
-
-        const filaSnap = await db.collection("fila")
-          .where("mesa", "==", proxima.mesaId)
-          .where("musica", "==", proxima.musica)
-          .limit(1).get();
-
-        if (filaSnap.empty) {
-          console.warn("⚠️ Música não encontrada na fila.");
-          return;
-        }
-
-        const doc = filaSnap.docs[0];
-        const data = doc.data();
-        if (!data.youtubeId || data.youtubeId.length !== 11) return;
-
-        tocandoAgora = { mesa: proxima.mesaId, musica: proxima.musica };
-        player.loadVideoById(data.youtubeId);
-
-        await db.collection("status").doc("tocandoAgora").set({
-          mesa: proxima.mesaId,
-          musica: proxima.musica,
-          youtubeId: data.youtubeId,
-          atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
-        });
-
-        document.getElementById("info").textContent = `🎤 Mesa ${proxima.mesaId} – ${proxima.musica}`;
-      } catch (e) {
-        console.error("Erro ao buscar próxima música:", e);
-      }
-    }
+      });
+    };
 
     function onPlayerError(event) {
       console.error("Erro ao carregar vídeo:", event.data);
@@ -225,6 +159,51 @@
       if (event.data === YT.PlayerState.ENDED) encerrarMusica();
       if (event.data === YT.PlayerState.PLAYING) {
         musicaTimeout = setTimeout(encerrarMusica, 10 * 60 * 1000);
+      }
+    }
+
+    async function tocarProxima() {
+      try {
+        const filaDoc = await db.collection("sistema").doc("filaOrdenada").get();
+        const fila = filaDoc.data()?.fila || [];
+
+        if (!fila.length) {
+          document.getElementById("info").textContent = "🎤 Ninguém na fila. Adicione uma música!";
+          return;
+        }
+
+        const proxima = fila[0];
+        if (!proxima || (tocandoAgora?.mesa === proxima.mesaId && tocandoAgora?.musica === proxima.musica)) return;
+
+        const musicaSnap = await db.collection("fila")
+          .where("mesa", "==", proxima.mesaId)
+          .where("musica", "==", proxima.musica)
+          .limit(1)
+          .get();
+
+        if (musicaSnap.empty) return;
+
+        const data = musicaSnap.docs[0].data();
+        const youtubeId = data.youtubeId;
+
+        if (!youtubeId || youtubeId.length !== 11) {
+          console.warn("ID de vídeo inválido:", youtubeId);
+          return;
+        }
+
+        tocandoAgora = { mesa: proxima.mesaId, musica: proxima.musica };
+        player.loadVideoById(youtubeId);
+
+        await db.collection("status").doc("tocandoAgora").set({
+          mesa: proxima.mesaId,
+          musica: proxima.musica,
+          youtubeId,
+          atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        document.getElementById("info").textContent = `🎤 Mesa ${proxima.mesaId} – ${proxima.musica}`;
+      } catch (e) {
+        console.error("Erro ao tocar próxima música:", e);
       }
     }
 
@@ -264,66 +243,74 @@
       }
     }
 
-    function tocarForcada(data) {
-      if (!data || (data.musica === tocandoAgora?.musica && data.mesa === tocandoAgora?.mesa)) return;
-      if (!player || typeof player.loadVideoById !== 'function') {
-        console.warn("⏳ Player ainda não está pronto (forcada)");
+    db.collection("status").doc("forcarTocar").onSnapshot(docSnap => {
+      const data = docSnap.data();
+      if (!data || !data.youtubeId || data.youtubeId.length !== 11) return;
+      if (!playerPronto) {
         setTimeout(() => tocarForcada(data), 500);
         return;
       }
+      tocarForcada(data);
+    });
 
+    function tocarForcada(data) {
       tocandoAgora = { mesa: data.mesa, musica: data.musica };
       player.loadVideoById(data.youtubeId);
       document.getElementById("info").textContent = `🎤 Mesa ${data.mesa} (Forçada) – ${data.musica}`;
-
-      db.collection("status").doc("tocandoAgora").set({
-        mesa: data.mesa,
-        musica: data.musica,
-        youtubeId: data.youtubeId,
-        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
-      });
-
-      forcarDataPendente = null;
     }
 
-    db.collection("status").doc("forcarTocar").onSnapshot(docSnap => {
-      const data = docSnap.data();
-      if (data) tocarForcada(data);
-    });
-
-    db.collection("sistema").doc("filaOrdenada").onSnapshot(docSnap => {
-      const fila = docSnap.data()?.fila || [];
+    db.collection("sistema").doc("filaOrdenada").onSnapshot(doc => {
+      const fila = doc.data()?.fila || [];
       if (!tocandoAgora && playerPronto) tocarProxima();
       renderizarMiniFila(fila);
     });
 
-    window.onYouTubeIframeAPIReady = () => {
-      player = new YT.Player('player', {
-        height: '100%',
-        width: '100%',
-        videoId: '',
-        playerVars: {
-          autoplay: 1,
-          controls: 1,
-          rel: 0,
-          modestbranding: 1,
-          origin: window.location.origin
-        },
-        events: {
-          onReady: () => {
-            playerPronto = true;
-            tocarProxima();
-            if (forcarDataPendente) tocarForcada(forcarDataPendente);
-          },
-          onError: onPlayerError,
-          onStateChange: onPlayerStateChange
-        }
+    function renderizarMiniFila(fila) {
+      const container = document.getElementById("listaFila");
+      container.innerHTML = "";
+      fila.slice(0, 10).forEach(item => {
+        const div = document.createElement("div");
+        div.className = "item-fila";
+        div.innerHTML = `
+          <span>${item.musica} <small>(Mesa ${item.mesaId})</small></span>
+          <button onclick="tocarAgoraMini('${item.mesaId}', \`${item.musica}\`)">▶</button>
+        `;
+        container.appendChild(div);
       });
-    };
+    }
 
-    // Abrir e fechar o painel da fila
-    document.getElementById("botaoFila").addEventListener("click", (e) => {
-      e.stopPropagation();
+    async function tocarAgoraMini(mesaId, musica) {
+      const snap = await db.collection("fila")
+        .where("mesa", "==", mesaId)
+        .where("musica", "==", musica)
+        .limit(1).get();
+
+      if (snap.empty) return alert("Música não encontrada.");
+
+      const data = snap.docs[0].data();
+      const youtubeId = data.youtubeId;
+      if (!youtubeId || youtubeId.length !== 11) return alert("ID de vídeo inválido.");
+
+      await db.collection("status").doc("forcarTocar").set({
+        mesa: mesaId,
+        musica,
+        youtubeId,
+        forcarEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      const filaAtual = (await db.collection("sistema").doc("filaOrdenada").get()).data()?.fila || [];
+      const novaFila = [
+        { mesaId, musica },
+        ...filaAtual.filter(f => f.mesaId !== mesaId || f.musica !== musica)
+      ];
+
+      await db.collection("sistema").doc("filaOrdenada").set({
+        fila: novaFila,
+        atualizadaEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+
+    document.getElementById("botaoFila").addEventListener("click", () => {
       const painel = document.getElementById("painelFila");
       painel.style.display = painel.style.display === "none" ? "block" : "none";
     });
@@ -335,13 +322,10 @@
         painel.style.display = "none";
       }
     });
-  </script>
 
-  <script>
     const tag = document.createElement('script');
     tag.src = "https://www.youtube.com/iframe_api";
-    const firstScriptTag = document.getElementsByTagName('script')[0];
-    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    document.head.appendChild(tag);
   </script>
 </body>
 </html>
