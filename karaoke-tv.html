@@ -96,7 +96,6 @@
         const proxima = fila[0];
         if (!proxima) return;
 
-        // Busca YouTube ID em "fila" com base na música + mesa
         const filaSnap = await db.collection("fila")
           .where("mesa", "==", proxima.mesaId)
           .where("musica", "==", proxima.musica)
@@ -119,7 +118,13 @@
 
         tocandoAgora = { mesa: proxima.mesaId, musica: proxima.musica };
 
-        player.loadVideoById(youtubeId);
+        if (player && typeof player.loadVideoById === 'function') {
+          player.loadVideoById(youtubeId);
+        } else {
+          console.warn("🚫 Player ainda não carregado. Tentando novamente...");
+          setTimeout(tocarProxima, 1000);
+          return;
+        }
 
         await db.collection("status").doc("tocandoAgora").set({
           mesa: proxima.mesaId,
@@ -148,7 +153,7 @@
       }
 
       if (event.data === YT.PlayerState.PLAYING) {
-        musicaTimeout = setTimeout(encerrarMusica, 10 * 60 * 1000); // 10 min travado
+        musicaTimeout = setTimeout(encerrarMusica, 10 * 60 * 1000); // segurança: pular após 10min
       }
     }
 
@@ -156,17 +161,20 @@
       try {
         if (!tocandoAgora) return;
 
-        await db.collection("fila").where("mesa", "==", tocandoAgora.mesa)
-          .where("musica", "==", tocandoAgora.musica).get().then(snapshot => {
-            snapshot.forEach(doc => doc.ref.delete());
-          });
+        const snapshot = await db.collection("fila")
+          .where("mesa", "==", tocandoAgora.mesa)
+          .where("musica", "==", tocandoAgora.musica)
+          .get();
+
+        for (const doc of snapshot.docs) {
+          await doc.ref.delete();
+        }
 
         await db.collection("mesas").doc(tocandoAgora.mesa).update({
           musicas: firebase.firestore.FieldValue.arrayRemove(tocandoAgora.musica),
           ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        // Remove da fila ordenada
         const filaDoc = await db.collection("sistema").doc("filaOrdenada").get();
         const novaFila = (filaDoc.data()?.fila || []).filter(item =>
           item.mesaId !== tocandoAgora.mesa || item.musica !== tocandoAgora.musica
@@ -176,7 +184,6 @@
           fila: novaFila,
           atualizadaEm: firebase.firestore.FieldValue.serverTimestamp()
         });
-
       } catch (e) {
         console.error("Erro ao encerrar música:", e);
       } finally {
@@ -186,27 +193,35 @@
       }
     }
 
-    db.collection("sistema").doc("filaOrdenada").onSnapshot(docSnap => {
-      if (!docSnap.exists || !docSnap.data()?.fila?.length) return;
-      if (!tocandoAgora) tocarProxima();
-    });
-
-    // Suporte a música forçada
-    db.collection("status").doc("forcarTocar").onSnapshot(async (docSnap) => {
-      const data = docSnap.data();
+    function tocarForcada(data) {
       if (!data || (data.musica === tocandoAgora?.musica && data.mesa === tocandoAgora?.mesa)) return;
 
       tocandoAgora = { mesa: data.mesa, musica: data.musica };
 
-      player.loadVideoById(data.youtubeId);
-      document.getElementById("info").textContent = `🎤 Mesa ${data.mesa} (Forçada) – ${data.musica}`;
+      if (player && typeof player.loadVideoById === 'function') {
+        player.loadVideoById(data.youtubeId);
+        document.getElementById("info").textContent = `🎤 Mesa ${data.mesa} (Forçada) – ${data.musica}`;
 
-      await db.collection("status").doc("tocandoAgora").set({
-        mesa: data.mesa,
-        musica: data.musica,
-        youtubeId: data.youtubeId,
-        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
-      });
+        db.collection("status").doc("tocandoAgora").set({
+          mesa: data.mesa,
+          musica: data.musica,
+          youtubeId: data.youtubeId,
+          atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      } else {
+        console.warn("🚫 Player ainda não carregado (forçada).");
+        setTimeout(() => tocarForcada(data), 1000);
+      }
+    }
+
+    db.collection("status").doc("forcarTocar").onSnapshot(docSnap => {
+      const data = docSnap.data();
+      if (data) tocarForcada(data);
+    });
+
+    db.collection("sistema").doc("filaOrdenada").onSnapshot(docSnap => {
+      if (!docSnap.exists || !docSnap.data()?.fila?.length) return;
+      if (!tocandoAgora) tocarProxima();
     });
   </script>
 </body>
