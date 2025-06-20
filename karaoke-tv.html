@@ -5,19 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Karaokê TV - Esquina's Bar</title>
   <style>
+    * { box-sizing: border-box; }
     body, html {
       margin: 0; padding: 0;
       background-color: #000;
       color: white;
       font-family: 'Segoe UI', sans-serif;
-      height: 100vh;
-      width: 100vw;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+      height: 100vh; width: 100vw;
+      overflow: hidden;
     }
-
     #info {
       position: absolute;
       top: 20px; left: 20px;
@@ -25,14 +21,24 @@
       padding: 10px 20px;
       border-radius: 8px;
       font-size: 18px;
+      z-index: 10;
     }
-
+    #loading {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 22px;
+      background: rgba(0,0,0,0.8);
+      padding: 20px 30px;
+      border-radius: 10px;
+      display: none;
+      z-index: 9;
+    }
     #player {
       width: 100%;
       height: 100%;
       max-height: 100vh;
     }
-
     #botaoFila {
       position: absolute;
       bottom: 20px;
@@ -44,8 +50,8 @@
       padding: 10px 16px;
       font-weight: bold;
       cursor: pointer;
+      z-index: 10;
     }
-
     #painelFila {
       position: absolute;
       right: 20px;
@@ -53,12 +59,12 @@
       background-color: rgba(0, 0, 0, 0.85);
       padding: 16px;
       border-radius: 8px;
-      max-height: 60vh;
+      max-height: 70vh;
       overflow-y: auto;
-      width: 300px;
+      width: 320px;
       display: none;
+      z-index: 10;
     }
-
     .item-fila {
       display: flex;
       justify-content: space-between;
@@ -69,7 +75,6 @@
       border-radius: 6px;
       font-size: 14px;
     }
-
     .item-fila button {
       background: #28a745;
       color: white;
@@ -78,14 +83,24 @@
       padding: 4px 8px;
       cursor: pointer;
     }
+
+    @media (max-width: 600px) {
+      #painelFila {
+        width: 90%;
+        left: 5%;
+        right: 5%;
+      }
+    }
   </style>
 </head>
 <body>
   <div id="info">Aguardando próxima música...</div>
+  <div id="loading">🔄 Carregando vídeo...</div>
   <div id="player"></div>
   <button id="botaoFila">🎵 Ver Fila</button>
   <div id="painelFila"><h3>🎶 Fila Atual</h3><div id="listaFila"></div></div>
 
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script>
@@ -102,43 +117,68 @@
 
     let player, tocandoAgora = null, playerPronto = false, musicaTimeout = null;
 
+    const info = document.getElementById("info");
+    const loading = document.getElementById("loading");
+
     window.onYouTubeIframeAPIReady = () => {
       player = new YT.Player('player', {
-        height: '100%', width: '100%', videoId: '',
+        height: '100%', width: '100%',
         playerVars: {
           autoplay: 1, controls: 1, rel: 0, modestbranding: 1,
           origin: window.location.origin
         },
         events: {
-          onReady: () => { playerPronto = true; tocarProxima(); },
-          onError: () => encerrarMusica(),
+          onReady: () => {
+            playerPronto = true;
+            tocarProxima();
+          },
+          onError: () => {
+            loading.style.display = "none";
+            encerrarMusica();
+          },
           onStateChange: e => {
             clearTimeout(musicaTimeout);
             if (e.data === YT.PlayerState.ENDED) encerrarMusica();
-            if (e.data === YT.PlayerState.PLAYING)
+            if (e.data === YT.PlayerState.PLAYING) {
+              loading.style.display = "none";
               musicaTimeout = setTimeout(encerrarMusica, 10 * 60 * 1000);
+            }
           }
         }
       });
     };
 
     async function tocarProxima() {
+      loading.style.display = "block";
       const doc = await db.collection("sistema").doc("filaOrdenada").get();
       const fila = doc.data()?.fila || [];
       if (!fila.length) {
-        document.getElementById("info").textContent = "🎤 Ninguém na fila. Adicione uma música!";
+        info.textContent = "🎤 Ninguém na fila. Adicione uma música!";
+        loading.style.display = "none";
         return;
       }
+
       const proxima = fila[0];
       const snap = await db.collection("fila")
         .where("mesa", "==", proxima.mesaId)
         .where("musica", "==", proxima.musica).limit(1).get();
 
-      if (snap.empty) return;
+      if (snap.empty) return encerrarMusica();
 
       const data = snap.docs[0].data();
       const id = data.youtubeId;
       if (!id || id.length !== 11) return encerrarMusica();
+
+      try {
+        const response = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=status&id=${id}&key=AIzaSyBGkT5z6i3KycQHvuutOYiUOeX1hDG15lw`);
+        const json = await response.json();
+        const status = json.items[0]?.status;
+        if (!status || status.embeddable === false || status.privacyStatus !== "public") {
+          return encerrarMusica();
+        }
+      } catch (e) {
+        return encerrarMusica();
+      }
 
       tocandoAgora = { mesa: proxima.mesaId, musica: proxima.musica };
       player.loadVideoById(id);
@@ -149,41 +189,61 @@
         youtubeId: id,
         atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
       });
-      document.getElementById("info").textContent = `🎤 Mesa ${proxima.mesaId} – ${proxima.musica}`;
+
+      info.textContent = `🎤 Mesa ${proxima.mesaId} – ${proxima.musica}`;
     }
 
-    async function encerrarMusica() {
-      if (!tocandoAgora) return;
-      const snap = await db.collection("fila")
-        .where("mesa", "==", tocandoAgora.mesa)
-        .where("musica", "==", tocandoAgora.musica).get();
-      snap.forEach(doc => doc.ref.delete());
+async function encerrarMusica() {
+  loading.style.display = "none";
+  if (!tocandoAgora) return;
 
-      await db.collection("mesas").doc(tocandoAgora.mesa).update({
-        musicas: firebase.firestore.FieldValue.arrayRemove(tocandoAgora.musica),
-        ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
-      });
+  // 1. Remover da coleção `fila`
+  const snapFila = await db.collection("fila")
+    .where("mesa", "==", tocandoAgora.mesa)
+    .where("musica", "==", tocandoAgora.musica)
+    .limit(1).get();
 
-      const filaDoc = await db.collection("sistema").doc("filaOrdenada").get();
-      const novaFila = (filaDoc.data()?.fila || []).filter(item =>
-        item.mesaId !== tocandoAgora.mesa || item.musica !== tocandoAgora.musica);
+  if (!snapFila.empty) {
+    await snapFila.docs[0].ref.delete();
+  }
 
-      await db.collection("sistema").doc("filaOrdenada").set({
-        fila: novaFila,
-        atualizadaEm: firebase.firestore.FieldValue.serverTimestamp()
-      });
+  // 2. Remover da subcoleção `mesas/{mesa}/musicas`
+  const snapMesa = await db.collection("mesas")
+    .doc(tocandoAgora.mesa)
+    .collection("musicas")
+    .where("musica", "==", tocandoAgora.musica)
+    .limit(1).get();
 
-      tocandoAgora = null;
-      document.getElementById("info").textContent = "Aguardando próxima música...";
-      if (playerPronto) tocarProxima();
-    }
+  if (!snapMesa.empty) {
+    await snapMesa.docs[0].ref.delete();
+  }
+
+  // 3. Atualizar filaOrdenada
+  const filaDoc = await db.collection("sistema").doc("filaOrdenada").get();
+  const novaFila = (filaDoc.data()?.fila || []).filter(item =>
+    item.mesaId !== tocandoAgora.mesa || item.musica !== tocandoAgora.musica
+  );
+
+  await db.collection("sistema").doc("filaOrdenada").set({
+    fila: novaFila,
+    atualizadaEm: firebase.firestore.FieldValue.serverTimestamp()
+  });
+
+  // 4. Resetar tocandoAgora
+  await db.collection("status").doc("tocandoAgora").delete();
+
+  tocandoAgora = null;
+  info.textContent = "Aguardando próxima música...";
+  if (playerPronto) tocarProxima();
+}
+
 
     db.collection("status").doc("forcarTocar").onSnapshot(doc => {
       const d = doc.data();
       if (!d || !d.youtubeId || d.youtubeId.length !== 11) return;
       tocandoAgora = { mesa: d.mesa, musica: d.musica };
       player.loadVideoById(d.youtubeId);
-      document.getElementById("info").textContent = `🎤 Mesa ${d.mesa} (Forçada) – ${d.musica}`;
+      info.textContent = `🎤 Mesa ${d.mesa} (Forçada) – ${d.musica}`;
     });
 
     db.collection("sistema").doc("filaOrdenada").onSnapshot(doc => {
