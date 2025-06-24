@@ -73,6 +73,25 @@
       margin-top: 10px;
       font-weight: bold;
     }
+
+    #toast {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #333;
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      opacity: 0;
+      transition: opacity 0.5s ease-in-out;
+      z-index: 9999;
+    }
+
+    #toast.show {
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
@@ -82,6 +101,8 @@
   <input type="text" id="musicaInput" placeholder="Digite uma música (ex: Evidências Zezé Di Camargo)" />
   <button id="botaoAdicionar" onclick="adicionarMusica()">Adicionar à fila</button>
   <div class="mensagem" id="mensagem"></div>
+  <div class="mensagem" id="contador"></div>
+  <div id="toast"></div>
 
   <h3>🎵 Suas músicas:</h3>
   <ul id="listaMusicas"></ul>
@@ -115,12 +136,20 @@
     const filaLista = document.getElementById("filaReproducao");
     const mensagem = document.getElementById("mensagem");
     const botao = document.getElementById("botaoAdicionar");
+    const contador = document.getElementById("contador");
 
     document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("titulo").textContent = `Karaokê - Mesa ${mesa}`;
       observarMusicas();
       observarFila();
     });
+
+    function showToast(text) {
+      const toast = document.getElementById("toast");
+      toast.textContent = text;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 3000);
+    }
 
     async function adicionarMusica() {
       const musicaInput = document.getElementById("musicaInput");
@@ -131,8 +160,7 @@
       mensagem.style.color = "green";
 
       if (!nomeMusica) {
-        mensagem.textContent = "Digite o nome da música.";
-        mensagem.style.color = "red";
+        showToast("Digite o nome da música.");
         return;
       }
 
@@ -148,8 +176,7 @@
         const data = await res.json();
 
         if (!data.youtubeId) {
-          mensagem.textContent = "Música não encontrada. Tente outro nome.";
-          mensagem.style.color = "red";
+          showToast("Música não encontrada. Tente outro nome.");
           botao.disabled = false;
           botao.textContent = "Adicionar à fila";
           return;
@@ -157,6 +184,14 @@
 
         const mesaRef = doc(db, "mesas", mesa);
         const docSnap = await getDoc(mesaRef);
+        const musicasAtuais = docSnap.exists() ? docSnap.data().musicas || [] : [];
+
+        if (musicasAtuais.length >= 2) {
+          showToast("Você já adicionou 2 músicas. Aguarde elas tocarem para adicionar mais.");
+          botao.disabled = false;
+          botao.textContent = "Adicionar à fila";
+          return;
+        }
 
         if (!docSnap.exists()) {
           await setDoc(mesaRef, {
@@ -179,12 +214,10 @@
         });
 
         musicaInput.value = "";
-        mensagem.textContent = `🎶 Adicionada: ${data.titulo}`;
-        mensagem.style.color = "green";
+        showToast(`🎶 Adicionada: ${data.titulo}`);
       } catch (error) {
         console.error(error);
-        mensagem.textContent = "Erro ao adicionar música.";
-        mensagem.style.color = "red";
+        showToast("Erro ao adicionar música.");
       } finally {
         botao.disabled = false;
         botao.textContent = "Adicionar à fila";
@@ -197,6 +230,7 @@
         const data = docSnap.data();
         const musicas = data?.musicas || [];
         renderizarLista(musicas);
+        contador.textContent = `🎵 Você pode adicionar ${2 - musicas.length} música(s).`;
       });
     }
 
@@ -249,19 +283,16 @@
         return;
       }
 
-      // Agrupa músicas por mesa
       const mesasMap = {};
       musicas.forEach((item) => {
         if (!mesasMap[item.mesa]) mesasMap[item.mesa] = [];
         mesasMap[item.mesa].push(item);
       });
 
-      // Ordena as músicas de cada mesa por ordem de chegada
       Object.values(mesasMap).forEach(lista =>
         lista.sort((a, b) => a.timestamp - b.timestamp)
       );
 
-      // Monta a fila final com rodízio de 2 por mesa por rodada
       const filaFinal = [];
       let aindaTem = true;
 
@@ -276,7 +307,6 @@
         }
       }
 
-      // Renderiza a lista reorganizada
       filaFinal.forEach((item, index) => {
         const li = document.createElement("li");
         li.innerHTML = `<strong>${index + 1}.</strong> ${item.musica} <small>(${item.nome} - Mesa ${item.mesa})</small>`;
