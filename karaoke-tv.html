@@ -106,43 +106,53 @@
     }
 
     async function buscarProximaMusica() {
-      try {
-        const snapshot = await db.collection("fila").orderBy("timestamp").limit(1).get();
+  try {
+    const docRef = await db.collection("sistema").doc("filaOrdenada").get();
 
-        if (snapshot.empty) {
-          currentDocId = null;
-          document.getElementById("info").textContent = "Aguardando próxima música...";
-          return;
-        }
-
-        const doc = snapshot.docs[0];
-        const data = doc.data();
-
-        if (!data.youtubeId || data.youtubeId.length !== 11) {
-          document.getElementById("info").textContent = "Erro: ID de vídeo inválido.";
-          return;
-        }
-
-        if (doc.id !== currentDocId) {
-          currentDocId = doc.id;
-          tocandoAgora = { mesa: data.mesa, musica: data.musica };
-
-          player.loadVideoById(data.youtubeId);
-
-          await db.collection("status").doc("tocandoAgora").set({
-            mesa: data.mesa,
-            musica: data.musica,
-            youtubeId: data.youtubeId,
-            atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
-          });
-
-          document.getElementById("info").textContent = `🎤 Mesa ${data.mesa} – ${data.musica}`;
-        }
-      } catch (e) {
-        console.error("Erro ao buscar música:", e);
-        document.getElementById("info").textContent = "Erro ao carregar música.";
-      }
+    if (!docRef.exists) {
+      currentDocId = null;
+      document.getElementById("info").textContent = "Aguardando próxima música...";
+      return;
     }
+
+    const lista = docRef.data().lista || [];
+
+    if (!lista.length) {
+      currentDocId = null;
+      document.getElementById("info").textContent = "Aguardando próxima música...";
+      return;
+    }
+
+    const musicaData = lista[0];
+
+    if (!musicaData.youtubeId || musicaData.youtubeId.length !== 11) {
+      document.getElementById("info").textContent = "Erro: ID de vídeo inválido.";
+      return;
+    }
+
+    const idVirtual = `${musicaData.mesa}_${musicaData.musica}`;
+
+    if (idVirtual !== currentDocId) {
+      currentDocId = idVirtual;
+      tocandoAgora = { mesa: musicaData.mesa, musica: musicaData.musica };
+
+      player.loadVideoById(musicaData.youtubeId);
+
+      await db.collection("status").doc("tocandoAgora").set({
+        mesa: musicaData.mesa,
+        musica: musicaData.musica,
+        youtubeId: musicaData.youtubeId,
+        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      document.getElementById("info").textContent = `🎤 Mesa ${musicaData.mesa} – ${musicaData.musica}`;
+    }
+  } catch (e) {
+    console.error("Erro ao buscar música:", e);
+    document.getElementById("info").textContent = "Erro ao carregar música.";
+  }
+}
+
 
     async function encerrarMusica(mesa, musica) {
       try {
@@ -166,14 +176,17 @@
     }
 
     // Reage a mudanças na fila
-    db.collection("fila").orderBy("timestamp").onSnapshot(snapshot => {
-      if (snapshot.empty) {
-        currentDocId = null;
-        document.getElementById("info").textContent = "Aguardando próxima música...";
-      } else {
-        buscarProximaMusica();
-      }
-    });
+db.collection("sistema").doc("filaOrdenada").onSnapshot(docSnap => {
+  const lista = docSnap.exists ? docSnap.data().lista : [];
+
+  if (!lista || lista.length === 0) {
+    currentDocId = null;
+    document.getElementById("info").textContent = "Aguardando próxima música...";
+  } else {
+    buscarProximaMusica();
+  }
+});
+
 
     // Reage a "forcarTocar"
     db.collection("status").doc("forcarTocar").onSnapshot(async (docSnap) => {
