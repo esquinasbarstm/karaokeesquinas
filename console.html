@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Console do Karaokê 🎤</title>
+  <title>Console do Karaokê 🎶</title>
   <style>
     body {
       font-family: sans-serif;
@@ -36,26 +36,33 @@
     }
     input {
       padding: 10px;
-      margin-right: 10px;
+      margin: 5px 5px 10px 0;
       border-radius: 5px;
       border: none;
+    }
+    .sortable {
+      display: flex;
+      flex-direction: column;
+    }
+    .sortable .card {
+      cursor: grab;
     }
   </style>
 </head>
 <body>
-
   <h1>🎶 Console do Karaokê</h1>
 
   <section class="catalogo">
     <h2>Adicionar Música ao Catálogo</h2>
     <input id="titulo" placeholder="Título da música" />
+    <input id="artista" placeholder="Artista" />
     <input id="youtubeId" placeholder="ID do YouTube" maxlength="11" />
     <button onclick="adicionarAoCatalogo()">Adicionar</button>
   </section>
 
   <section class="fila">
-    <h2>Fila Atual</h2>
-    <div id="listaFila"></div>
+    <h2>Fila Atual (arraste para reordenar)</h2>
+    <div id="listaFila" class="sortable"></div>
   </section>
 
   <section class="fila">
@@ -63,10 +70,8 @@
     <div id="listaCatalogo"></div>
   </section>
 
-  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyBGkT5z6i3KycQHvuutOYiUOeX1hDG15lw",
@@ -82,11 +87,11 @@
 
     function renderizarFila(fila) {
       listaFila.innerHTML = "";
-      const contadorPorMesa = {};
-
       fila.forEach((item, index) => {
         const div = document.createElement("div");
         div.className = "card";
+        div.draggable = true;
+        div.dataset.index = index;
         div.innerHTML = `
           <div>
             <strong>${item.musica}</strong><br/>
@@ -95,12 +100,8 @@
           <button onclick="removerDaFila(${index})">Remover</button>
         `;
         listaFila.appendChild(div);
-
-        if (!contadorPorMesa[item.mesa]) contadorPorMesa[item.mesa] = 0;
-        contadorPorMesa[item.mesa]++;
       });
-
-      console.log("🎯 Contador por mesa:", contadorPorMesa);
+      ativarDragDrop();
     }
 
     function renderizarCatalogo(lista) {
@@ -111,6 +112,7 @@
         div.innerHTML = `
           <div>
             <strong>${item.titulo}</strong><br/>
+            Artista: ${item.artista || 'Não informado'}<br/>
             ID: ${item.youtubeId}
           </div>
         `;
@@ -120,29 +122,32 @@
 
     function adicionarAoCatalogo() {
       const titulo = document.getElementById("titulo").value.trim();
+      const artista = document.getElementById("artista").value.trim();
       const youtubeId = document.getElementById("youtubeId").value.trim();
       if (!titulo || youtubeId.length !== 11) {
         alert("Preencha corretamente os campos.");
         return;
       }
 
-      db.collection("musicasDisponiveis").add({ titulo, youtubeId })
-        .then(() => {
-          document.getElementById("titulo").value = "";
-          document.getElementById("youtubeId").value = "";
-          alert("✅ Música adicionada ao catálogo!");
-        });
+      db.collection("musicasDisponiveis").add({
+        titulo,
+        artista,
+        youtubeId,
+        link: `https://www.youtube.com/watch?v=${youtubeId}`
+      }).then(() => {
+        document.getElementById("titulo").value = "";
+        document.getElementById("artista").value = "";
+        document.getElementById("youtubeId").value = "";
+        alert("✅ Música adicionada ao catálogo!");
+      });
     }
 
     function removerDaFila(index) {
       db.collection("sistema").doc("filaOrdenada").get().then(doc => {
         if (!doc.exists) return;
-
         const fila = doc.data().fila || [];
         const removida = fila.splice(index, 1)[0];
-
         db.collection("sistema").doc("filaOrdenada").set({ fila });
-
         if (removida?.mesa && removida?.musica) {
           db.collection("mesas").doc(removida.mesa).update({
             musicas: firebase.firestore.FieldValue.arrayRemove(removida.musica),
@@ -152,13 +157,42 @@
       });
     }
 
-    // Observa a fila
+    function ativarDragDrop() {
+      let dragSrcEl = null;
+      listaFila.querySelectorAll(".card").forEach(card => {
+        card.addEventListener("dragstart", e => {
+          dragSrcEl = card;
+          e.dataTransfer.effectAllowed = "move";
+        });
+        card.addEventListener("dragover", e => {
+          e.preventDefault();
+        });
+        card.addEventListener("drop", e => {
+          e.preventDefault();
+          if (dragSrcEl !== card) {
+            const origem = parseInt(dragSrcEl.dataset.index);
+            const destino = parseInt(card.dataset.index);
+            reorganizarFila(origem, destino);
+          }
+        });
+      });
+    }
+
+    function reorganizarFila(origem, destino) {
+      db.collection("sistema").doc("filaOrdenada").get().then(doc => {
+        if (!doc.exists) return;
+        const fila = doc.data().fila || [];
+        const [movida] = fila.splice(origem, 1);
+        fila.splice(destino, 0, movida);
+        db.collection("sistema").doc("filaOrdenada").set({ fila });
+      });
+    }
+
     db.collection("sistema").doc("filaOrdenada").onSnapshot(doc => {
       const dados = doc.data();
       renderizarFila(dados?.fila || []);
     });
 
-    // Observa o catálogo
     db.collection("musicasDisponiveis").onSnapshot(snapshot => {
       const lista = snapshot.docs.map(doc => doc.data());
       renderizarCatalogo(lista);
