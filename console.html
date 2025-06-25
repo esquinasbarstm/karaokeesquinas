@@ -71,6 +71,11 @@
   </section>
 
   <section class="fila">
+    <h2>Últimas 10 Tocadas</h2>
+    <div id="listaHistorico"></div>
+  </section>
+
+  <section class="fila">
     <h2>Catálogo de Músicas</h2>
     <div id="listaCatalogo"></div>
   </section>
@@ -83,12 +88,12 @@
       authDomain: "esquina-s-karaoke.firebaseapp.com",
       projectId: "esquina-s-karaoke"
     };
-
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
     const listaFila = document.getElementById("listaFila");
     const listaCatalogo = document.getElementById("listaCatalogo");
+    const listaHistorico = document.getElementById("listaHistorico");
 
     function renderizarFila(fila) {
       listaFila.innerHTML = "";
@@ -117,6 +122,23 @@
       ativarDragDrop();
     }
 
+    function renderizarHistorico(lista) {
+      listaHistorico.innerHTML = "";
+      lista.slice(0, 10).forEach(item => {
+        const div = document.createElement("div");
+        div.className = "card";
+        div.innerHTML = `
+          <div>
+            <strong>${item.musica}</strong><br/>
+            Artista: ${item.artista || "Desconhecido"}<br/>
+            Mesa: ${item.mesa || "?"}<br/>
+            <a class="youtube-link" href="https://www.youtube.com/watch?v=${item.youtubeId}" target="_blank">▶️ Assistir</a>
+          </div>
+        `;
+        listaHistorico.appendChild(div);
+      });
+    }
+
     function renderizarCatalogo(lista) {
       listaCatalogo.innerHTML = "";
       lista.forEach((item) => {
@@ -141,11 +163,8 @@
         alert("Preencha corretamente os campos.");
         return;
       }
-
       db.collection("musicasDisponiveis").add({
-        titulo,
-        artista,
-        youtubeId,
+        titulo, artista, youtubeId,
         link: `https://www.youtube.com/watch?v=${youtubeId}`
       }).then(() => {
         document.getElementById("titulo").value = "";
@@ -203,6 +222,11 @@
     db.collection("sistema").doc("filaOrdenada").onSnapshot(doc => {
       const dados = doc.data();
       renderizarFila(dados?.musicas || []);
+    });
+
+    db.collection("historico").orderBy("tocadaEm", "desc").limit(10).onSnapshot(snapshot => {
+      const lista = snapshot.docs.map(doc => doc.data());
+      renderizarHistorico(lista);
     });
 
     db.collection("musicasDisponiveis").onSnapshot(snapshot => {
