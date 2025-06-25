@@ -105,9 +105,9 @@
 
       try {
         // Atualiza filaOrdenada
-        await db.collection("sistema").doc("filaOrdenada").update({ musicas: filaAtual });
+        await db.collection("sistema").doc("filaOrdenada").set({ musicas: filaAtual }, { merge: true });
 
-        // Atualiza mesa
+        // Atualiza mesa (remove a música da lista da mesa)
         if (removida?.mesa && removida?.musica) {
           await db.collection("mesas").doc(removida.mesa).update({
             musicas: firebase.firestore.FieldValue.arrayRemove(removida.musica),
@@ -115,11 +115,11 @@
           });
         }
 
-        // Remove da coleção "fila" se tiver docIdOriginal
-        if (removida?.docIdOriginal) {
-          await db.collection("fila").doc(removida.docIdOriginal).delete();
-          console.log(`✅ Removido de /fila/${removida.docIdOriginal}`);
-        }
+        // Salva no histórico
+        await db.collection("historico").add({
+          ...removida,
+          tocadaEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
 
         setTimeout(() => tocarProxima(), 1500);
       } catch (err) {
