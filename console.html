@@ -158,9 +158,10 @@
     function removerDaFila(index) {
       db.collection("sistema").doc("filaOrdenada").get().then(doc => {
         if (!doc.exists) return;
-        const fila = doc.data().fila || [];
+        const fila = doc.data().musicas || [];
         const removida = fila.splice(index, 1)[0];
-        db.collection("sistema").doc("filaOrdenada").set({ fila });
+        db.collection("sistema").doc("filaOrdenada").set({ musicas: fila });
+
         if (removida?.mesa && removida?.musica) {
           db.collection("mesas").doc(removida.mesa).update({
             musicas: firebase.firestore.FieldValue.arrayRemove(removida.musica),
@@ -192,17 +193,16 @@
     function reorganizarFila(origem, destino) {
       db.collection("sistema").doc("filaOrdenada").get().then(doc => {
         if (!doc.exists) return;
-        const fila = doc.data().fila || [];
+        const fila = doc.data().musicas || [];
         const [movida] = fila.splice(origem, 1);
         fila.splice(destino, 0, movida);
-        db.collection("sistema").doc("filaOrdenada").set({ fila });
+        db.collection("sistema").doc("filaOrdenada").set({ musicas: fila });
       });
     }
 
     db.collection("sistema").doc("filaOrdenada").onSnapshot(doc => {
       const dados = doc.data();
-      console.log("🎧 Fila atualizada:", dados);
-      renderizarFila(dados?.fila || []);
+      renderizarFila(dados?.musicas || []);
     });
 
     db.collection("musicasDisponiveis").onSnapshot(snapshot => {
