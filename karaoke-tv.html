@@ -4,22 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Karaokê TV - Esquina's Bar</title>
-  <link rel="icon" href="data:," />
   <style>
     body, html {
-      margin: 0;
-      padding: 0;
+      margin: 0; padding: 0;
       background-color: #000;
       color: white;
       font-family: 'Segoe UI', sans-serif;
-      height: 100vh;
-      width: 100vw;
+      height: 100vh; width: 100vw;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
     }
-
     #info {
       position: absolute;
       top: 20px;
@@ -29,7 +25,6 @@
       border-radius: 8px;
       font-size: 18px;
     }
-
     #player {
       width: 100%;
       height: 100%;
@@ -41,7 +36,6 @@
   <div id="info">Aguardando próxima música...</div>
   <div id="player"></div>
 
-  <!-- Firebase + YouTube API -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="https://www.youtube.com/iframe_api"></script>
@@ -60,169 +54,126 @@
     const db = firebase.firestore();
 
     let player;
-    let currentDocId = null;
-    let musicaTimeout;
+    let currentId = null;
     let tocandoAgora = null;
+    let musicaTimeout;
 
     window.onYouTubeIframeAPIReady = () => {
       player = new YT.Player('player', {
         height: '100%',
         width: '100%',
         videoId: '',
-        playerVars: {
-          autoplay: 1,
-          controls: 1,
-          rel: 0,
-          modestbranding: 1,
-          origin: window.location.origin
-        },
+        playerVars: { autoplay: 1, controls: 1, rel: 0, modestbranding: 1 },
         events: {
           'onReady': buscarProximaMusica,
-          'onError': onPlayerError,
-          'onStateChange': onPlayerStateChange
+          'onStateChange': onPlayerStateChange,
+          'onError': onPlayerError
         }
       });
     };
 
-    function onPlayerError(event) {
-      console.error("Erro ao carregar vídeo:", event.data);
-      document.getElementById("info").textContent = "Erro ao carregar o vídeo. Pulando...";
-      encerrarMusica(tocandoAgora?.mesa, tocandoAgora?.musica);
+    function onPlayerError(e) {
+      console.warn("Erro no player", e.data);
+      document.getElementById("info").textContent = "Erro no vídeo. Pulando...";
+      encerrarMusica();
     }
 
-    function onPlayerStateChange(event) {
+    function onPlayerStateChange(e) {
       clearTimeout(musicaTimeout);
-
-      if (event.data === YT.PlayerState.ENDED && currentDocId) {
-        encerrarMusica(tocandoAgora?.mesa, tocandoAgora?.musica);
-      }
-
-      if (event.data === YT.PlayerState.PLAYING) {
-        musicaTimeout = setTimeout(() => {
-          console.warn("Vídeo travado? Pulando...");
-          encerrarMusica(tocandoAgora?.mesa, tocandoAgora?.musica);
-        }, 10 * 60 * 1000); // 10 minutos
+      if (e.data === YT.PlayerState.ENDED) encerrarMusica();
+      if (e.data === YT.PlayerState.PLAYING) {
+        musicaTimeout = setTimeout(() => encerrarMusica(), 10 * 60 * 1000);
       }
     }
 
     async function buscarProximaMusica() {
-  try {
-    const docRef = await db.collection("sistema").doc("filaOrdenada").get();
-
-    if (!docRef.exists) {
-      currentDocId = null;
-      document.getElementById("info").textContent = "Aguardando próxima música...";
-      return;
-    }
-
-    const lista = docRef.data().fila || [];
-
-    if (!lista.length) {
-      currentDocId = null;
-      document.getElementById("info").textContent = "Aguardando próxima música...";
-      return;
-    }
-
-    const musicaData = lista[0];
-
-    if (!musicaData.youtubeId || musicaData.youtubeId.length !== 11) {
-      document.getElementById("info").textContent = "Erro: ID de vídeo inválido.";
-      return;
-    }
-
-    const idVirtual = `${musicaData.mesa}_${musicaData.musica}`;
-
-    if (idVirtual !== currentDocId) {
-      currentDocId = idVirtual;
-      tocandoAgora = { mesa: musicaData.mesa, musica: musicaData.musica };
-
-      player.loadVideoById(musicaData.youtubeId);
-
-      await db.collection("status").doc("tocandoAgora").set({
-        mesa: musicaData.mesa,
-        musica: musicaData.musica,
-        youtubeId: musicaData.youtubeId,
-        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
-      });
-
-      document.getElementById("info").textContent = `🎤 Mesa ${musicaData.mesa} – ${musicaData.musica}`;
-    }
-  } catch (e) {
-    console.error("Erro ao buscar música:", e);
-    document.getElementById("info").textContent = "Erro ao carregar música.";
-  }
-}
-
-
-    async function encerrarMusica(mesa, musica) {
       try {
-        if (currentDocId && !currentDocId.startsWith("forcada_")) {
-          await db.collection("fila").doc(currentDocId).delete();
+        const snap = await db.collection("sistema").doc("filaOrdenada").get();
+        const fila = snap.exists ? snap.data().fila || [] : [];
+
+        if (!fila.length) {
+          currentId = null;
+          tocandoAgora = null;
+          document.getElementById("info").textContent = "Aguardando próxima música...";
+          return;
         }
 
-        if (mesa && musica) {
-          await db.collection("mesas").doc(mesa).update({
-            musicas: firebase.firestore.FieldValue.arrayRemove(musica),
+        const msc = fila[0];
+        const idVirtual = `${msc.mesa}_${msc.musica}`;
+
+        if (idVirtual === currentId) return;
+
+        currentId = idVirtual;
+        tocandoAgora = { ...msc };
+
+        player.loadVideoById(msc.youtubeId);
+
+        document.getElementById("info").textContent = `🎤 Mesa ${msc.mesa} – ${msc.musica}`;
+
+        await db.collection("status").doc("tocandoAgora").set({
+          mesa: msc.mesa,
+          musica: msc.musica,
+          youtubeId: msc.youtubeId,
+          atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      } catch (err) {
+        console.error("Erro ao buscar próxima música:", err);
+      }
+    }
+
+    async function encerrarMusica() {
+      try {
+        const filaDoc = await db.collection("sistema").doc("filaOrdenada").get();
+        const fila = filaDoc.exists ? filaDoc.data().fila || [] : [];
+
+        const novaFila = fila.slice(1); // Remove a primeira
+
+        await db.collection("sistema").doc("filaOrdenada").set({ fila: novaFila });
+
+        if (tocandoAgora?.mesa && tocandoAgora?.musica) {
+          await db.collection("mesas").doc(tocandoAgora.mesa).update({
+            musicas: firebase.firestore.FieldValue.arrayRemove(tocandoAgora.musica),
             ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
           });
         }
-      } catch (e) {
-        console.error("Erro ao encerrar música:", e);
+      } catch (err) {
+        console.error("Erro ao encerrar música:", err);
       } finally {
-        currentDocId = null;
+        currentId = null;
         document.getElementById("info").textContent = "Aguardando próxima música...";
         buscarProximaMusica();
       }
     }
 
-    // Reage a mudanças na fila
-db.collection("sistema").doc("filaOrdenada").onSnapshot(docSnap => {
-  const lista = docSnap.exists ? docSnap.data().fila : [];
-
-  if (!lista || lista.length === 0) {
-    currentDocId = null;
-    document.getElementById("info").textContent = "Aguardando próxima música...";
-  } else {
-    buscarProximaMusica();
-  }
-});
-
-
-    // Reage a "forcarTocar"
-    db.collection("status").doc("forcarTocar").onSnapshot(async (docSnap) => {
-      if (!docSnap.exists) return;
-      const data = docSnap.data();
-
-      if (data.musica === tocandoAgora?.musica && data.mesa === tocandoAgora?.mesa) return;
-
-      try {
-        const mesaDoc = await db.collection("mesas").doc(data.mesa).get();
-        const musicas = mesaDoc.data()?.musicas || [];
-        const musicaExiste = musicas.includes(data.musica);
-        if (!musicaExiste) return;
-
-        currentDocId = "forcada_" + Date.now(); // fake ID
-        tocandoAgora = { mesa: data.mesa, musica: data.musica };
-
-        const youtubeId = data.youtubeId;
-        if (!youtubeId || youtubeId.length !== 11) {
-          document.getElementById("info").textContent = "Erro: ID de vídeo inválido (forçado).";
-          return;
-        }
-
-        player.loadVideoById(youtubeId);
-
-        await db.collection("status").doc("tocandoAgora").set({
-          mesa: data.mesa,
-          musica: data.musica,
-          youtubeId,
-          atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
-        });
-
-        document.getElementById("info").textContent = `🎤 Mesa ${data.mesa} (Forçada) – ${data.musica}`;
-      } catch (err) {
-        console.error("Erro ao forçar música:", err);
+    db.collection("sistema").doc("filaOrdenada").onSnapshot(doc => {
+      const fila = doc.exists ? doc.data().fila : [];
+      if (!fila.length) {
+        currentId = null;
+        tocandoAgora = null;
+        document.getElementById("info").textContent = "Aguardando próxima música...";
+        return;
       }
+      buscarProximaMusica();
+    });
+
+    db.collection("status").doc("forcarTocar").onSnapshot(async doc => {
+      const data = doc.data();
+      if (!doc.exists || !data?.youtubeId) return;
+      if (tocandoAgora?.mesa === data.mesa && tocandoAgora?.musica === data.musica) return;
+
+      tocandoAgora = { mesa: data.mesa, musica: data.musica };
+      currentId = "forcada_" + Date.now();
+
+      player.loadVideoById(data.youtubeId);
+
+      document.getElementById("info").textContent = `🎤 Mesa ${data.mesa} (Forçada) – ${data.musica}`;
+
+      await db.collection("status").doc("tocandoAgora").set({
+        mesa: data.mesa,
+        musica: data.musica,
+        youtubeId: data.youtubeId,
+        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
     });
   </script>
 </body>
