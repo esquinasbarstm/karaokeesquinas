@@ -76,13 +76,12 @@
       }
 
       infoDiv.innerText = `🎤 Tocando agora: ${proxima.musica} (Mesa ${proxima.mesa})`;
-
       player.loadVideoById(proxima.youtubeId);
     }
 
     function removerMusicaAtual() {
       const removida = filaAtual.shift();
-      db.collection("sistema").doc("filaOrdenada").set({ fila: filaAtual });
+      db.collection("sistema").doc("filaOrdenada").update({ musicas: filaAtual });
 
       if (removida?.mesa && removida?.musica) {
         db.collection("mesas").doc(removida.mesa).update({
@@ -100,14 +99,17 @@
         width: '1000',
         videoId: '',
         events: {
-          onReady: () => tocarProxima(),
+          onReady: () => {
+            console.log("✅ Player pronto");
+            tocarProxima();
+          },
           onStateChange: event => {
             if (event.data === YT.PlayerState.ENDED) {
               removerMusicaAtual();
             }
           },
-          onError: () => {
-            console.warn("Erro ao tocar vídeo, pulando...");
+          onError: err => {
+            console.warn("❌ Erro ao carregar vídeo:", err);
             removerMusicaAtual();
           }
         },
@@ -116,16 +118,18 @@
           controls: 1,
           rel: 0,
           modestbranding: 1,
-          origin: location.origin
+          origin: window.location.origin
         }
       });
     }
 
     db.collection("sistema").doc("filaOrdenada").onSnapshot(doc => {
-      const novaFila = doc.data()?.fila || [];
+      const novaFila = doc.data()?.musicas || [];
       if (JSON.stringify(filaAtual) !== JSON.stringify(novaFila)) {
         filaAtual = [...novaFila];
-        tocarProxima();
+        if (player?.getPlayerState() !== YT.PlayerState.PLAYING) {
+          tocarProxima();
+        }
       }
     });
   </script>
