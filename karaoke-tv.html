@@ -17,7 +17,6 @@
       justify-content: center;
       flex-direction: column;
     }
-
     #video {
       width: 100%;
       max-width: 1000px;
@@ -25,12 +24,10 @@
       margin-bottom: 20px;
       background-color: #111;
     }
-
     #info {
       font-size: 20px;
       margin-bottom: 10px;
     }
-
     #status {
       background: #222;
       padding: 10px 20px;
@@ -79,15 +76,25 @@
       player.loadVideoById(proxima.youtubeId);
     }
 
-    function removerMusicaAtual() {
+    async function removerMusicaAtual() {
       const removida = filaAtual.shift();
-      db.collection("sistema").doc("filaOrdenada").update({ musicas: filaAtual });
+      await db.collection("sistema").doc("filaOrdenada").update({ musicas: filaAtual });
 
       if (removida?.mesa && removida?.musica) {
-        db.collection("mesas").doc(removida.mesa).update({
+        await db.collection("mesas").doc(removida.mesa).update({
           musicas: firebase.firestore.FieldValue.arrayRemove(removida.musica),
           ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
         });
+      }
+
+      // NOVO: remover também da coleção 'fila'
+      if (removida?.docIdOriginal) {
+        try {
+          await db.collection("fila").doc(removida.docIdOriginal).delete();
+          console.log(`✅ Removido também de /fila/${removida.docIdOriginal}`);
+        } catch (err) {
+          console.error("❌ Erro ao remover da fila original:", err);
+        }
       }
 
       setTimeout(() => tocarProxima(), 2000); // Espera 2s para próxima
