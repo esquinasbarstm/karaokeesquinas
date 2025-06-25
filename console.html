@@ -174,26 +174,32 @@
       });
     }
 
-    function removerDaFila(index) {
-      db.collection("sistema").doc("filaOrdenada").get().then(doc => {
-        if (!doc.exists) return;
-        const fila = doc.data().musicas || [];
+    async function removerDaFila(index) {
+      try {
+        const docRef = await db.collection("sistema").doc("filaOrdenada").get();
+        if (!docRef.exists) return;
+
+        const fila = docRef.data().musicas || [];
         const removida = fila.splice(index, 1)[0];
-        db.collection("sistema").doc("filaOrdenada").set({ musicas: fila });
+        await db.collection("sistema").doc("filaOrdenada").set({ musicas: fila });
 
         if (removida?.mesa && removida?.musica) {
-          db.collection("mesas").doc(removida.mesa).update({
+          await db.collection("mesas").doc(removida.mesa).update({
             musicas: firebase.firestore.FieldValue.arrayRemove(removida.musica),
             ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
           });
         }
 
         if (removida?.docIdOriginal) {
-          db.collection("fila").doc(removida.docIdOriginal).delete()
-            .then(() => console.log("✅ Removido da fila original"))
-            .catch((err) => console.error("❌ Erro ao remover da fila original:", err));
+          await db.collection("fila").doc(removida.docIdOriginal).delete();
+          console.log("✅ Música removida da coleção 'fila'");
         }
-      });
+
+        alert(`✅ Música "${removida.musica}" removida da fila`);
+      } catch (err) {
+        console.error("❌ Erro ao remover da fila:", err);
+        alert("Erro ao remover música.");
+      }
     }
 
     function ativarDragDrop() {
@@ -226,8 +232,7 @@
     }
 
     db.collection("sistema").doc("filaOrdenada").onSnapshot(doc => {
-      const dados = doc.data();
-      renderizarFila(dados?.musicas || []);
+      renderizarFila(doc.data()?.musicas || []);
     });
 
     db.collection("historico").orderBy("tocadaEm", "desc").limit(10).onSnapshot(snapshot => {
