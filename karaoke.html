@@ -102,7 +102,8 @@
       getFirestore, doc, getDoc, setDoc, updateDoc,
       arrayUnion, arrayRemove, onSnapshot, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { addMusicaNaFilaPorRodada } from '/rodizio.js';
+    
+    
 
     const firebaseConfig = {
       apiKey: "AIzaSyBGkT5z6i3KycQHvuutOYiUOeX1hDG15lw",
@@ -116,12 +117,61 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
+    async function addMusicaNaFilaPorRodada({ mesa, musica, youtubeId, nome }) {
+  const filaRef = doc(db, "sistema", "filaOrdenada");
+  const filaSnap = await getDoc(filaRef);
+  let fila = filaSnap.exists() ? filaSnap.data().fila || [] : [];
+
+  // Agrupa por mesa
+  const grupos = {};
+  const ordem = [];
+
+  fila.forEach(item => {
+    if (!grupos[item.mesa]) {
+      grupos[item.mesa] = [];
+      ordem.push(item.mesa);
+    }
+    grupos[item.mesa].push(item);
+  });
+
+  // Adiciona nova música no grupo da mesa correspondente
+  if (!grupos[mesa]) {
+    grupos[mesa] = [];
+    ordem.push(mesa);
+  }
+  grupos[mesa].push({ mesa, musica, youtubeId, nome });
+
+  // Reorganiza a fila com até 2 músicas por rodada por mesa
+  const novaFila = [];
+  let aindaTem = true;
+
+  while (aindaTem) {
+    aindaTem = false;
+    for (const mesaAtual of ordem) {
+      const filaMesa = grupos[mesaAtual];
+      if (filaMesa && filaMesa.length) {
+        novaFila.push(filaMesa.shift());
+        aindaTem = aindaTem || filaMesa.length > 0;
+        if (filaMesa.length) {
+          novaFila.push(filaMesa.shift());
+        }
+      }
+    }
+  }
+
+  await setDoc(filaRef, { fila: novaFila });
+}
+
     const params = new URLSearchParams(window.location.search);
     const mesa = params.get("mesa") || "sem-mesa";
     const lista = document.getElementById("listaMusicas");
     const mensagem = document.getElementById("mensagem");
     const botao = document.getElementById("botaoAdicionar");
     const contador = document.getElementById("contador");
+    if (!mesa) {
+      alert("Mesa não especificada. Use ?mesa=numero para acessar.");
+      throw new Error("Mesa não especificada");
+    }
 
     document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("titulo").textContent = `Karaokê - Mesa ${mesa}`;
@@ -241,6 +291,7 @@
 
     window.adicionarMusica = adicionarMusica;
     window.removerMusica = removerMusica;
+    
   </script>
 </body>
 </html>
