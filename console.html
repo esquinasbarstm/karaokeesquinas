@@ -187,6 +187,12 @@
             ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
           });
         }
+
+        if (removida?.docIdOriginal) {
+          db.collection("fila").doc(removida.docIdOriginal).delete()
+            .then(() => console.log("✅ Removido da fila original"))
+            .catch((err) => console.error("❌ Erro ao remover da fila original:", err));
+        }
       });
     }
 
