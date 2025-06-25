@@ -115,7 +115,7 @@
       return;
     }
 
-    const lista = docRef.data().lista || [];
+    const lista = docRef.data().fila || [];
 
     if (!lista.length) {
       currentDocId = null;
@@ -177,7 +177,7 @@
 
     // Reage a mudanças na fila
 db.collection("sistema").doc("filaOrdenada").onSnapshot(docSnap => {
-  const lista = docSnap.exists ? docSnap.data().lista : [];
+  const lista = docSnap.exists ? docSnap.data().fila : [];
 
   if (!lista || lista.length === 0) {
     currentDocId = null;
