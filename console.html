@@ -47,6 +47,11 @@
     .sortable .card {
       cursor: grab;
     }
+    a.youtube-link {
+      color: #0af;
+      text-decoration: none;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
@@ -88,14 +93,22 @@
     function renderizarFila(fila) {
       listaFila.innerHTML = "";
       fila.forEach((item, index) => {
+        const musica = item.musica || item.titulo || "🎵 Sem título";
+        const artista = item.artista || "";
+        const mesa = item.mesa || "Mesa não identificada";
+        const youtubeId = item.youtubeId || null;
+        const linkHTML = youtubeId ? `<br><a class="youtube-link" href="https://www.youtube.com/watch?v=${youtubeId}" target="_blank">▶️ Assistir</a>` : "";
+
         const div = document.createElement("div");
         div.className = "card";
         div.draggable = true;
         div.dataset.index = index;
         div.innerHTML = `
           <div>
-            <strong>${item.musica}</strong><br/>
-            Mesa: ${item.mesa}
+            <strong>${musica}</strong><br/>
+            ${artista ? "Artista: " + artista + "<br/>" : ""}
+            Mesa: ${mesa}
+            ${linkHTML}
           </div>
           <button onclick="removerDaFila(${index})">Remover</button>
         `;
@@ -164,9 +177,7 @@
           dragSrcEl = card;
           e.dataTransfer.effectAllowed = "move";
         });
-        card.addEventListener("dragover", e => {
-          e.preventDefault();
-        });
+        card.addEventListener("dragover", e => e.preventDefault());
         card.addEventListener("drop", e => {
           e.preventDefault();
           if (dragSrcEl !== card) {
@@ -190,6 +201,7 @@
 
     db.collection("sistema").doc("filaOrdenada").onSnapshot(doc => {
       const dados = doc.data();
+      console.log("🎧 Fila atualizada:", dados);
       renderizarFila(dados?.fila || []);
     });
 
