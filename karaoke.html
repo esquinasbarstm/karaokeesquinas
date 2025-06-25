@@ -38,31 +38,23 @@
       cursor: pointer;
     }
 
+    .container { position: relative; width: 100%; max-width: 400px; }
     ul {
       list-style: none;
       padding: 0;
       max-width: 400px;
-      width: 100%;
       background: #222;
       border-radius: 8px;
       margin-top: -5px;
       position: absolute;
       z-index: 10;
     }
-
     ul li {
       padding: 10px;
       cursor: pointer;
     }
-
     ul li:hover {
       background-color: #444;
-    }
-
-    .container {
-      position: relative;
-      width: 100%;
-      max-width: 400px;
     }
 
     #minhasMusicas {
@@ -133,6 +125,29 @@
       border-radius: 6px;
       cursor: pointer;
     }
+
+    table {
+      margin-top: 40px;
+      width: 100%;
+      max-width: 600px;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 8px;
+      border: 1px solid #444;
+      text-align: center;
+    }
+
+    th {
+      background-color: #333;
+      color: #fff;
+    }
+
+    td {
+      background-color: #222;
+    }
+
   </style>
 </head>
 <body>
@@ -156,31 +171,35 @@
   <h3>📚 Catálogo completo:</h3>
   <div id="catalogoContainer"></div>
 
-  <!-- Firebase SDK -->
+  <h3>📊 Fila Geral (ao vivo)</h3>
+  <table id="tabelaFila">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Música</th>
+        <th>Mesa</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyBGkT5z6i3KycQHvuutOYiUOeX1hDG15lw",
       authDomain: "esquina-s-karaoke.firebaseapp.com",
-      projectId: "esquina-s-karaoke",
-      storageBucket: "esquina-s-karaoke.firebasestorage.app",
-      messagingSenderId: "259976490299",
-      appId: "1:259976490299:web:a7964bf79f1ead7e5e5b1e"
+      projectId: "esquina-s-karaoke"
     };
-
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    const searchInput = document.getElementById('searchInput');
-    const suggestions = document.getElementById('suggestions');
-    const mesaInput = document.getElementById('mesaInput');
-    const listaMusicas = document.getElementById('listaMusicas');
-    const contador = document.getElementById('contador');
+    const mesaInput = document.getElementById("mesaInput");
+    const searchInput = document.getElementById("searchInput");
+    const suggestions = document.getElementById("suggestions");
+    const listaMusicas = document.getElementById("listaMusicas");
+    const contador = document.getElementById("contador");
 
-    let todasAsMusicas = [];
-
-    // Pega número da mesa da URL
     const params = new URLSearchParams(window.location.search);
     const mesaURL = params.get("mesa");
     if (mesaURL) {
@@ -188,10 +207,11 @@
       observarMusicas();
     }
 
+    let todasAsMusicas = [];
+
     searchInput.addEventListener("input", () => {
       const texto = searchInput.value.toLowerCase();
       suggestions.innerHTML = "";
-
       if (!texto || texto.length < 2) return;
 
       const filtradas = todasAsMusicas.filter(musica =>
@@ -208,14 +228,10 @@
 
     async function carregarCatalogo() {
       const snapshot = await db.collection("musicasDisponiveis").get();
-      todasAsMusicas = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      todasAsMusicas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      const container = document.getElementById('catalogoContainer');
+      const container = document.getElementById("catalogoContainer");
       container.innerHTML = "";
-
       todasAsMusicas.forEach(musica => {
         const card = document.createElement("div");
         card.className = "catalogo-card";
@@ -250,6 +266,7 @@
         mesa,
         musica: musica.titulo,
         youtubeId: musica.youtubeId,
+        docIdOriginal: docId,
         link: musica.link || `https://www.youtube.com/watch?v=${musica.youtubeId}`,
         adicionadaEm: firebase.firestore.FieldValue.serverTimestamp()
       });
@@ -261,7 +278,6 @@
 
       searchInput.value = "";
       suggestions.innerHTML = "";
-
       await atualizarFilaOrdenada();
     }
 
@@ -311,7 +327,6 @@
 
     function renderizarLista(musicas) {
       listaMusicas.innerHTML = "";
-
       if (musicas.length === 0) {
         listaMusicas.innerHTML = "<p>Nenhuma música adicionada ainda.</p>";
         return;
@@ -333,25 +348,28 @@
       if (!mesa || isNaN(mesa)) return;
 
       const docId = `${mesa}_${titulo}`;
-
       await db.collection("fila").doc(docId).delete();
       await db.collection("mesas").doc(mesa).update({
         musicas: firebase.firestore.FieldValue.arrayRemove(titulo),
         ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
       });
-
       await atualizarFilaOrdenada();
     }
 
     window.removerMusica = removerMusica;
-  </script>
 
-  <script>
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") {
-        suggestions.innerHTML = "";
-        searchInput.value = "";
-      }
+    // 🔁 Visualização da fila ordenada ao vivo
+    const tabelaBody = document.querySelector("#tabelaFila tbody");
+    db.collection("sistema").doc("filaOrdenada").onSnapshot(doc => {
+      const dados = doc.data();
+      const fila = dados?.musicas || [];
+      tabelaBody.innerHTML = fila.map((m, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td>${m.musica || "-"}</td>
+          <td>${m.mesa || "-"}</td>
+        </tr>
+      `).join("");
     });
   </script>
 </body>
