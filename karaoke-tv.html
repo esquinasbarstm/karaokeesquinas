@@ -13,20 +13,27 @@
       font-family: 'Segoe UI', sans-serif;
       height: 100vh;
       display: flex;
-      align-items: center;
-      justify-content: center;
       flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
     }
     #video {
       width: 100%;
-      max-width: 1000px;
-      height: 562px;
-      margin-bottom: 20px;
+      max-width: 1280px;
+      height: 720px;
+      margin: 20px 0;
       background-color: #111;
     }
     #info {
-      font-size: 20px;
+      font-size: 24px;
+      margin-top: 20px;
+      text-align: center;
+    }
+    #proxima {
+      font-size: 18px;
+      color: #aaa;
       margin-bottom: 10px;
+      text-align: center;
     }
     #status {
       background: #222;
@@ -38,6 +45,7 @@
 </head>
 <body>
   <div id="info">Aguardando próxima música...</div>
+  <div id="proxima"></div>
   <div id="video"></div>
   <div id="status">🎵 TV do Karaokê</div>
 
@@ -55,13 +63,28 @@
     const db = firebase.firestore();
 
     const infoDiv = document.getElementById("info");
+    const proximaDiv = document.getElementById("proxima");
     let player;
     let filaAtual = [];
 
-    function tocarProxima() {
+    function atualizarInfos() {
       if (!filaAtual.length) {
         infoDiv.innerText = "Aguardando próxima música...";
+        proximaDiv.innerText = "";
         player?.stopVideo();
+        return;
+      }
+
+      const atual = filaAtual[0];
+      const proxima = filaAtual[1];
+
+      infoDiv.innerText = `🎤 Tocando agora: ${atual.musica} (Mesa ${atual.mesa})`;
+      proximaDiv.innerText = proxima ? `🎶 Próxima: ${proxima.musica} (Mesa ${proxima.mesa})` : "";
+    }
+
+    function tocarProxima() {
+      if (!filaAtual.length) {
+        atualizarInfos();
         return;
       }
 
@@ -72,7 +95,7 @@
         return;
       }
 
-      infoDiv.innerText = `🎤 Tocando agora: ${proxima.musica} (Mesa ${proxima.mesa})`;
+      atualizarInfos();
       player.loadVideoById(proxima.youtubeId);
     }
 
@@ -87,7 +110,6 @@
         });
       }
 
-      // NOVO: remover também da coleção 'fila'
       if (removida?.docIdOriginal) {
         try {
           await db.collection("fila").doc(removida.docIdOriginal).delete();
@@ -97,13 +119,13 @@
         }
       }
 
-      setTimeout(() => tocarProxima(), 2000); // Espera 2s para próxima
+      setTimeout(() => tocarProxima(), 2000);
     }
 
     function onYouTubeIframeAPIReady() {
       player = new YT.Player('video', {
-        height: '562',
-        width: '1000',
+        height: '720',
+        width: '1280',
         videoId: '',
         events: {
           onReady: () => {
@@ -111,9 +133,7 @@
             tocarProxima();
           },
           onStateChange: event => {
-            if (event.data === YT.PlayerState.ENDED) {
-              removerMusicaAtual();
-            }
+            if (event.data === YT.PlayerState.ENDED) removerMusicaAtual();
           },
           onError: err => {
             console.warn("❌ Erro ao carregar vídeo:", err);
@@ -134,9 +154,8 @@
       const novaFila = doc.data()?.musicas || [];
       if (JSON.stringify(filaAtual) !== JSON.stringify(novaFila)) {
         filaAtual = [...novaFila];
-        if (player?.getPlayerState() !== YT.PlayerState.PLAYING) {
-          tocarProxima();
-        }
+        if (player?.getPlayerState() !== YT.PlayerState.PLAYING) tocarProxima();
+        else atualizarInfos();
       }
     });
   </script>
