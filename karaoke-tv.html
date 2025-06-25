@@ -2,50 +2,47 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Karaokê TV - Esquina's Bar</title>
   <style>
     body, html {
-      margin: 0; padding: 0;
+      margin: 0;
+      padding: 0;
       background-color: #000;
       color: white;
       font-family: 'Segoe UI', sans-serif;
-      height: 100vh; width: 100vw;
+      height: 100vh;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
+      flex-direction: column;
     }
+
+    #video {
+      width: 100%;
+      max-width: 1000px;
+      height: 562px;
+      margin-bottom: 20px;
+      background-color: #111;
+    }
+
     #info {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      background-color: rgba(0, 0, 0, 0.6);
+      font-size: 20px;
+      margin-bottom: 10px;
+    }
+
+    #status {
+      background: #222;
       padding: 10px 20px;
       border-radius: 8px;
-      font-size: 18px;
-    }
-    #proxima {
-      position: absolute;
-      bottom: 20px;
-      left: 20px;
-      background-color: rgba(0, 0, 0, 0.6);
-      padding: 8px 16px;
-      border-radius: 6px;
-      font-size: 16px;
-      color: #ccc;
-    }
-    #player {
-      width: 100%;
-      height: 100%;
-      max-height: 100vh;
+      color: #0af;
     }
   </style>
 </head>
 <body>
   <div id="info">Aguardando próxima música...</div>
-  <div id="proxima"></div>
-  <div id="player"></div>
+  <div id="video"></div>
+  <div id="status">🎵 TV do Karaokê</div>
 
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -55,147 +52,81 @@
     const firebaseConfig = {
       apiKey: "AIzaSyBGkT5z6i3KycQHvuutOYiUOeX1hDG15lw",
       authDomain: "esquina-s-karaoke.firebaseapp.com",
-      projectId: "esquina-s-karaoke",
-      storageBucket: "esquina-s-karaoke.firebasestorage.app",
-      messagingSenderId: "259976490299",
-      appId: "1:259976490299:web:a7964bf79f1ead7e5e5b1e"
+      projectId: "esquina-s-karaoke"
     };
-
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
+    const infoDiv = document.getElementById("info");
     let player;
-    let currentId = null;
-    let tocandoAgora = null;
-    let musicaTimeout;
-    let delayProxima = null;
+    let filaAtual = [];
 
-    window.onYouTubeIframeAPIReady = () => {
-      player = new YT.Player('player', {
-        height: '100%',
-        width: '100%',
+    function tocarProxima() {
+      if (!filaAtual.length) {
+        infoDiv.innerText = "Aguardando próxima música...";
+        player?.stopVideo();
+        return;
+      }
+
+      const proxima = filaAtual[0];
+      if (!proxima || !proxima.youtubeId) {
+        console.warn("⚠️ Música inválida ou sem youtubeId:", proxima);
+        removerMusicaAtual();
+        return;
+      }
+
+      infoDiv.innerText = `🎤 Tocando agora: ${proxima.musica} (Mesa ${proxima.mesa})`;
+
+      player.loadVideoById(proxima.youtubeId);
+    }
+
+    function removerMusicaAtual() {
+      const removida = filaAtual.shift();
+      db.collection("sistema").doc("filaOrdenada").set({ fila: filaAtual });
+
+      if (removida?.mesa && removida?.musica) {
+        db.collection("mesas").doc(removida.mesa).update({
+          musicas: firebase.firestore.FieldValue.arrayRemove(removida.musica),
+          ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+
+      setTimeout(() => tocarProxima(), 2000); // Espera 2s para próxima
+    }
+
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('video', {
+        height: '562',
+        width: '1000',
         videoId: '',
-        playerVars: { autoplay: 1, controls: 1, rel: 0, modestbranding: 1 },
         events: {
-          'onReady': buscarProximaMusica,
-          'onStateChange': onPlayerStateChange,
-          'onError': onPlayerError
+          onReady: () => tocarProxima(),
+          onStateChange: event => {
+            if (event.data === YT.PlayerState.ENDED) {
+              removerMusicaAtual();
+            }
+          },
+          onError: () => {
+            console.warn("Erro ao tocar vídeo, pulando...");
+            removerMusicaAtual();
+          }
+        },
+        playerVars: {
+          autoplay: 1,
+          controls: 1,
+          rel: 0,
+          modestbranding: 1,
+          origin: location.origin
         }
       });
-    };
-
-    function onPlayerError(e) {
-      console.warn("Erro no player", e.data);
-      document.getElementById("info").textContent = "Erro no vídeo. Pulando...";
-      encerrarMusica();
-    }
-
-    function onPlayerStateChange(e) {
-      clearTimeout(musicaTimeout);
-      clearTimeout(delayProxima);
-
-      if (e.data === YT.PlayerState.ENDED) {
-        delayProxima = setTimeout(() => encerrarMusica(), 10000); // 10 segundos
-      }
-
-      if (e.data === YT.PlayerState.PLAYING) {
-        musicaTimeout = setTimeout(() => encerrarMusica(), 10 * 60 * 1000);
-      }
-    }
-
-    async function buscarProximaMusica() {
-      try {
-        const snap = await db.collection("sistema").doc("filaOrdenada").get();
-        const fila = snap.exists ? snap.data().fila || [] : [];
-
-        if (!fila.length) {
-          currentId = null;
-          tocandoAgora = null;
-          document.getElementById("info").textContent = "Aguardando próxima música...";
-          document.getElementById("proxima").textContent = "";
-          return;
-        }
-
-        const msc = fila[0];
-        const proxima = fila[1];
-        const idVirtual = `${msc.mesa}_${msc.musica}`;
-
-        if (idVirtual === currentId) return;
-
-        currentId = idVirtual;
-        tocandoAgora = { ...msc };
-
-        player.loadVideoById(msc.youtubeId);
-
-        document.getElementById("info").textContent = `🎤 Mesa ${msc.mesa} – ${msc.musica}`;
-        document.getElementById("proxima").textContent = proxima ? `Próxima: Mesa ${proxima.mesa} - ${proxima.musica}` : "";
-
-        await db.collection("status").doc("tocandoAgora").set({
-          mesa: msc.mesa,
-          musica: msc.musica,
-          youtubeId: msc.youtubeId,
-          atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
-        });
-      } catch (err) {
-        console.error("Erro ao buscar próxima música:", err);
-      }
-    }
-
-    async function encerrarMusica() {
-      try {
-        const filaDoc = await db.collection("sistema").doc("filaOrdenada").get();
-        const fila = filaDoc.exists ? filaDoc.data().fila || [] : [];
-        const novaFila = fila.slice(1);
-
-        await db.collection("sistema").doc("filaOrdenada").set({ fila: novaFila });
-
-        if (tocandoAgora?.mesa && tocandoAgora?.musica) {
-          await db.collection("mesas").doc(tocandoAgora.mesa).update({
-            musicas: firebase.firestore.FieldValue.arrayRemove(tocandoAgora.musica),
-            ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
-          });
-        }
-      } catch (err) {
-        console.error("Erro ao encerrar música:", err);
-      } finally {
-        currentId = null;
-        document.getElementById("info").textContent = "Aguardando próxima música...";
-        document.getElementById("proxima").textContent = "";
-        buscarProximaMusica();
-      }
     }
 
     db.collection("sistema").doc("filaOrdenada").onSnapshot(doc => {
-      const fila = doc.exists ? doc.data().fila : [];
-      if (!fila.length) {
-        currentId = null;
-        tocandoAgora = null;
-        document.getElementById("info").textContent = "Aguardando próxima música...";
-        document.getElementById("proxima").textContent = "";
-        return;
+      const novaFila = doc.data()?.fila || [];
+      if (JSON.stringify(filaAtual) !== JSON.stringify(novaFila)) {
+        filaAtual = [...novaFila];
+        tocarProxima();
       }
-      buscarProximaMusica();
-    });
-
-    db.collection("status").doc("forcarTocar").onSnapshot(async doc => {
-      const data = doc.data();
-      if (!doc.exists || !data?.youtubeId) return;
-      if (tocandoAgora?.mesa === data.mesa && tocandoAgora?.musica === data.musica) return;
-
-      tocandoAgora = { mesa: data.mesa, musica: data.musica };
-      currentId = "forcada_" + Date.now();
-
-      player.loadVideoById(data.youtubeId);
-
-      document.getElementById("info").textContent = `🎤 Mesa ${data.mesa} (Forçada) – ${data.musica}`;
-      document.getElementById("proxima").textContent = "";
-
-      await db.collection("status").doc("tocandoAgora").set({
-        mesa: data.mesa,
-        musica: data.musica,
-        youtubeId: data.youtubeId,
-        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
-      });
     });
   </script>
 </body>
