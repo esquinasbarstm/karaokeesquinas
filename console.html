@@ -11,12 +11,8 @@
       color: #fff;
       padding: 20px;
     }
-    h1 {
-      text-align: center;
-    }
-    .catalogo, .fila {
-      margin: 20px 0;
-    }
+    h1 { text-align: center; }
+    .catalogo, .fila { margin: 20px 0; }
     .card {
       background: #222;
       padding: 10px;
@@ -40,13 +36,8 @@
       border-radius: 5px;
       border: none;
     }
-    .sortable {
-      display: flex;
-      flex-direction: column;
-    }
-    .sortable .card {
-      cursor: grab;
-    }
+    .sortable { display: flex; flex-direction: column; }
+    .sortable .card { cursor: grab; }
     a.youtube-link {
       color: #0af;
       text-decoration: none;
@@ -189,12 +180,6 @@
             ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
           });
         }
-
-        if (removida?.docIdOriginal) {
-          await db.collection("fila").doc(removida.docIdOriginal).delete();
-          console.log("✅ Música removida da coleção 'fila'");
-        }
-
         alert(`✅ Música "${removida.musica}" removida da fila`);
       } catch (err) {
         console.error("❌ Erro ao remover da fila:", err);
