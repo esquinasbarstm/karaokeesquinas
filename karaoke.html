@@ -13,7 +13,9 @@
       flex-direction: column;
       align-items: center;
     }
+
     h1 { margin-bottom: 20px; }
+
     input, button {
       padding: 12px;
       margin: 10px 0;
@@ -23,6 +25,7 @@
       border-radius: 8px;
       border: 1px solid #ccc;
     }
+
     button {
       background: #ff0080;
       color: white;
@@ -30,15 +33,18 @@
       font-weight: bold;
       cursor: pointer;
     }
+
     button:hover {
       opacity: 0.9;
     }
+
     ul {
       list-style: none;
       padding: 0;
       max-width: 400px;
       width: 100%;
     }
+
     li {
       background: white;
       padding: 12px;
@@ -49,9 +55,11 @@
       justify-content: space-between;
       align-items: center;
     }
+
     .destaque {
       background: #d7ffd9 !important;
     }
+
     .remove {
       background: red;
       color: white;
@@ -60,10 +68,12 @@
       padding: 5px 10px;
       cursor: pointer;
     }
+
     .mensagem {
       margin-top: 10px;
       font-weight: bold;
     }
+
     #toast {
       position: fixed;
       bottom: 30px;
@@ -78,6 +88,7 @@
       transition: opacity 0.5s ease-in-out;
       z-index: 9999;
     }
+
     #toast.show {
       opacity: 1;
     }
@@ -96,14 +107,16 @@
   <h3>🎵 Suas músicas:</h3>
   <ul id="listaMusicas"></ul>
 
+  <h3>🎤 Fila de reprodução:</h3>
+  <ul id="filaReproducao"></ul>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import {
       getFirestore, doc, getDoc, setDoc, updateDoc,
-      arrayUnion, arrayRemove, onSnapshot, serverTimestamp
+      arrayUnion, arrayRemove, onSnapshot, serverTimestamp,
+      addDoc, collection
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    
-    
 
     const firebaseConfig = {
       apiKey: "AIzaSyBGkT5z6i3KycQHvuutOYiUOeX1hDG15lw",
@@ -117,65 +130,18 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    async function addMusicaNaFilaPorRodada({ mesa, musica, youtubeId, nome }) {
-  const filaRef = doc(db, "sistema", "filaOrdenada");
-  const filaSnap = await getDoc(filaRef);
-  let fila = filaSnap.exists() ? filaSnap.data().fila || [] : [];
-
-  // Agrupa por mesa
-  const grupos = {};
-  const ordem = [];
-
-  fila.forEach(item => {
-    if (!grupos[item.mesa]) {
-      grupos[item.mesa] = [];
-      ordem.push(item.mesa);
-    }
-    grupos[item.mesa].push(item);
-  });
-
-  // Adiciona nova música no grupo da mesa correspondente
-  if (!grupos[mesa]) {
-    grupos[mesa] = [];
-    ordem.push(mesa);
-  }
-  grupos[mesa].push({ mesa, musica, youtubeId, nome });
-
-  // Reorganiza a fila com até 2 músicas por rodada por mesa
-  const novaFila = [];
-  let aindaTem = true;
-
-  while (aindaTem) {
-    aindaTem = false;
-    for (const mesaAtual of ordem) {
-      const filaMesa = grupos[mesaAtual];
-      if (filaMesa && filaMesa.length) {
-        novaFila.push(filaMesa.shift());
-        aindaTem = aindaTem || filaMesa.length > 0;
-        if (filaMesa.length) {
-          novaFila.push(filaMesa.shift());
-        }
-      }
-    }
-  }
-
-  await setDoc(filaRef, { fila: novaFila });
-}
-
     const params = new URLSearchParams(window.location.search);
     const mesa = params.get("mesa") || "sem-mesa";
     const lista = document.getElementById("listaMusicas");
+    const filaLista = document.getElementById("filaReproducao");
     const mensagem = document.getElementById("mensagem");
     const botao = document.getElementById("botaoAdicionar");
     const contador = document.getElementById("contador");
-    if (!mesa) {
-      alert("Mesa não especificada. Use ?mesa=numero para acessar.");
-      throw new Error("Mesa não especificada");
-    }
 
     document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("titulo").textContent = `Karaokê - Mesa ${mesa}`;
       observarMusicas();
+      observarFila();
     });
 
     function showToast(text) {
@@ -239,11 +205,12 @@
           });
         }
 
-        await addMusicaNaFilaPorRodada({
-          mesa,
+        await addDoc(collection(db, "fila"), {
+          mesa: mesa,
           musica: data.titulo,
           youtubeId: data.youtubeId,
-          nome: nomePessoa || "Cliente"
+          nome: nomePessoa || "Cliente",
+          timestamp: serverTimestamp()
         });
 
         musicaInput.value = "";
@@ -289,9 +256,69 @@
       });
     }
 
+    function observarFila() {
+      const filaRef = collection(db, "fila");
+      onSnapshot(filaRef, (snapshot) => {
+        const musicas = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          musicas.push({
+            id: doc.id,
+            mesa: data.mesa,
+            musica: data.musica,
+            nome: data.nome || "Cliente",
+            timestamp: data.timestamp?.toDate() || new Date()
+          });
+        });
+
+        musicas.sort((a, b) => a.timestamp - b.timestamp);
+        renderizarFila(musicas);
+      });
+    }
+
+    function renderizarFila(musicas) {
+      filaLista.innerHTML = '';
+      if (musicas.length === 0) {
+        filaLista.innerHTML = "<li>Fila vazia no momento.</li>";
+        return;
+      }
+
+      const mesasMap = {};
+      musicas.forEach((item) => {
+        if (!mesasMap[item.mesa]) mesasMap[item.mesa] = [];
+        mesasMap[item.mesa].push(item);
+      });
+
+      Object.values(mesasMap).forEach(lista =>
+        lista.sort((a, b) => a.timestamp - b.timestamp)
+      );
+
+      const filaFinal = [];
+      let aindaTem = true;
+
+      while (aindaTem) {
+        aindaTem = false;
+        for (const mesa in mesasMap) {
+          const musicasDaMesa = mesasMap[mesa];
+          if (musicasDaMesa.length > 0) {
+            aindaTem = true;
+            filaFinal.push(...musicasDaMesa.splice(0, 2));
+          }
+        }
+      }
+
+      filaFinal.forEach((item, index) => {
+        const li = document.createElement("li");
+        li.innerHTML = `<strong>${index + 1}.</strong> ${item.musica} <small>(${item.nome} - Mesa ${item.mesa})</small>`;
+        if (item.mesa === mesa) {
+          li.classList.add("destaque");
+        }
+        filaLista.appendChild(li);
+      });
+    }
+
     window.adicionarMusica = adicionarMusica;
     window.removerMusica = removerMusica;
-    
   </script>
 </body>
 </html>
