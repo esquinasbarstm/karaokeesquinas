@@ -253,7 +253,7 @@
         mesa,
         musica: musica.titulo,
         youtubeId: musica.youtubeId,
-        link: musica.link,
+        link: musica.link || `https://www.youtube.com/watch?v=${musica.youtubeId}`,
         adicionadaEm: firebase.firestore.FieldValue.serverTimestamp()
       });
 
@@ -313,3 +313,12 @@
   </script>
 </body>
 </html>
+<script>
+    // Adiciona evento de teclado para fechar sugestões
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        suggestions.innerHTML = "";
+        searchInput.value = "";
+      }
+    });
+  </script>
