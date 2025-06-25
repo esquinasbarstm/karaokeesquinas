@@ -92,6 +92,47 @@
       font-weight: bold;
       color: #aaa;
     }
+
+    #catalogoContainer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 20px;
+      justify-content: center;
+      max-width: 800px;
+    }
+
+    .catalogo-card {
+      background: #222;
+      border-radius: 8px;
+      padding: 10px;
+      width: 220px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      border: 1px solid #333;
+    }
+
+    .catalogo-card strong {
+      font-size: 16px;
+      color: #fff;
+    }
+
+    .catalogo-card span {
+      font-size: 14px;
+      color: #aaa;
+      margin-bottom: 6px;
+    }
+
+    .catalogo-card button {
+      margin-top: auto;
+      padding: 6px 10px;
+      background: #ff0077;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -111,6 +152,9 @@
     <h3>🎶 Suas músicas:</h3>
     <div id="listaMusicas"></div>
   </div>
+
+  <h3>📚 Catálogo completo:</h3>
+  <div id="catalogoContainer"></div>
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -136,15 +180,13 @@
 
     let todasAsMusicas = [];
 
-    async function carregarCatalogo() {
-      const snapshot = await db.collection("musicasDisponiveis").get();
-      todasAsMusicas = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+    // Pega número da mesa da URL se houver
+    const params = new URLSearchParams(window.location.search);
+    const mesaURL = params.get("mesa");
+    if (mesaURL) {
+      mesaInput.value = mesaURL;
+      observarMusicas();
     }
-
-    carregarCatalogo();
 
     mesaInput.addEventListener("input", observarMusicas);
 
@@ -166,6 +208,32 @@
       });
     });
 
+    async function carregarCatalogo() {
+      const snapshot = await db.collection("musicasDisponiveis").get();
+      todasAsMusicas = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // Catálogo visual
+      const container = document.getElementById('catalogoContainer');
+      container.innerHTML = "";
+
+      todasAsMusicas.forEach(musica => {
+        const card = document.createElement("div");
+        card.className = "catalogo-card";
+        card.innerHTML = `
+          <strong>${musica.titulo}</strong>
+          <span>${musica.artista || ''}</span>
+          <button>Adicionar</button>
+        `;
+        card.querySelector('button').onclick = () => adicionarMusica(musica);
+        container.appendChild(card);
+      });
+    }
+
+    carregarCatalogo();
+
     async function adicionarMusica(musica) {
       const mesa = mesaInput.value.trim();
       if (!mesa || isNaN(mesa)) return alert("Informe o número da mesa!");
@@ -185,6 +253,7 @@
         mesa,
         musica: musica.titulo,
         youtubeId: musica.youtubeId,
+        link: musica.link,
         adicionadaEm: firebase.firestore.FieldValue.serverTimestamp()
       });
 
