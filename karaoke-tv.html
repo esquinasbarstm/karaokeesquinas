@@ -66,18 +66,18 @@
     const proximaDiv = document.getElementById("proxima");
     let player;
     let filaAtual = [];
+    let musicaTocandoId = null;
 
     function atualizarInfos() {
       if (!filaAtual.length) {
         infoDiv.innerText = "Aguardando próxima música...";
         proximaDiv.innerText = "";
         player?.stopVideo();
+        musicaTocandoId = null;
         return;
       }
-
       const atual = filaAtual[0];
       const proxima = filaAtual[1];
-
       infoDiv.innerText = `🎤 Tocando agora: ${atual.musica} (Mesa ${atual.mesa})`;
       proximaDiv.innerText = proxima ? `🎶 Próxima: ${proxima.musica} (Mesa ${proxima.mesa})` : "";
     }
@@ -87,14 +87,13 @@
         atualizarInfos();
         return;
       }
-
       const proxima = filaAtual[0];
       if (!proxima || !proxima.youtubeId) {
         console.warn("⚠️ Música inválida ou sem youtubeId:", proxima);
         removerMusicaAtual();
         return;
       }
-
+      musicaTocandoId = proxima.youtubeId;
       atualizarInfos();
       player.loadVideoById(proxima.youtubeId);
     }
@@ -133,7 +132,9 @@
             tocarProxima();
           },
           onStateChange: event => {
-            if (event.data === YT.PlayerState.ENDED) removerMusicaAtual();
+            if (event.data === YT.PlayerState.ENDED && player.getVideoData().video_id === musicaTocandoId) {
+              removerMusicaAtual();
+            }
           },
           onError: err => {
             console.warn("❌ Erro ao carregar vídeo:", err);
@@ -152,10 +153,12 @@
 
     db.collection("sistema").doc("filaOrdenada").onSnapshot(doc => {
       const novaFila = doc.data()?.musicas || [];
-      if (JSON.stringify(filaAtual) !== JSON.stringify(novaFila)) {
-        filaAtual = [...novaFila];
-        if (player?.getPlayerState() !== YT.PlayerState.PLAYING) tocarProxima();
-        else atualizarInfos();
+      const mesmaFila = JSON.stringify(filaAtual) === JSON.stringify(novaFila);
+      filaAtual = [...novaFila];
+      if (!mesmaFila && player?.getPlayerState() !== YT.PlayerState.PLAYING) {
+        tocarProxima();
+      } else {
+        atualizarInfos();
       }
     });
   </script>
