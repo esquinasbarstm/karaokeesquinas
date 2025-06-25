@@ -139,7 +139,7 @@
   <h1>Escolha sua música 🎤</h1>
 
   <label>Mesa:</label>
-  <input type="number" id="mesaInput" placeholder="Número da mesa (ex: 5)" />
+  <input type="text" id="mesaInput" readonly style="background:#333; color:white;" />
 
   <div class="container">
     <input id="searchInput" placeholder="Digite o nome da música..." autocomplete="off" />
@@ -180,15 +180,13 @@
 
     let todasAsMusicas = [];
 
-    // Pega número da mesa da URL se houver
+    // Pega número da mesa da URL
     const params = new URLSearchParams(window.location.search);
     const mesaURL = params.get("mesa");
     if (mesaURL) {
       mesaInput.value = mesaURL;
       observarMusicas();
     }
-
-    mesaInput.addEventListener("input", observarMusicas);
 
     searchInput.addEventListener("input", () => {
       const texto = searchInput.value.toLowerCase();
@@ -215,7 +213,6 @@
         ...doc.data()
       }));
 
-      // Catálogo visual
       const container = document.getElementById('catalogoContainer');
       container.innerHTML = "";
 
@@ -254,7 +251,6 @@
         musica: musica.titulo,
         youtubeId: musica.youtubeId,
         link: musica.link || `https://www.youtube.com/watch?v=${musica.youtubeId}`,
-
         adicionadaEm: firebase.firestore.FieldValue.serverTimestamp()
       });
 
@@ -265,6 +261,41 @@
 
       searchInput.value = "";
       suggestions.innerHTML = "";
+
+      await atualizarFilaOrdenada();
+    }
+
+    async function atualizarFilaOrdenada() {
+      const snapshot = await db.collection("fila").get();
+      const fila = snapshot.docs.map(doc => doc.data());
+
+      const porMesa = {};
+      fila.forEach(m => {
+        if (!porMesa[m.mesa]) porMesa[m.mesa] = [];
+        porMesa[m.mesa].push(m);
+      });
+
+      const ordemMesas = Object.keys(porMesa);
+      const filaOrdenada = [];
+      let aindaTem = true;
+      let rodada = 0;
+
+      while (aindaTem) {
+        aindaTem = false;
+        for (const mesa of ordemMesas) {
+          const filaMesa = porMesa[mesa];
+          const inicio = rodada * 2;
+          const blocos = filaMesa.slice(inicio, inicio + 2);
+          filaOrdenada.push(...blocos);
+          if (filaMesa.length > inicio + 2) aindaTem = true;
+        }
+        rodada++;
+      }
+
+      await db.collection("sistema").doc("filaOrdenada").set({
+        musicas: filaOrdenada,
+        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
     }
 
     function observarMusicas() {
@@ -308,14 +339,14 @@
         musicas: firebase.firestore.FieldValue.arrayRemove(titulo),
         ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
       });
+
+      await atualizarFilaOrdenada();
     }
 
     window.removerMusica = removerMusica;
   </script>
-</body>
-</html>
-<script>
-    // Adiciona evento de teclado para fechar sugestões
+
+  <script>
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         suggestions.innerHTML = "";
@@ -323,3 +354,5 @@
       }
     });
   </script>
+</body>
+</html>
