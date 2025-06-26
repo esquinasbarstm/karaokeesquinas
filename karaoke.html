@@ -315,31 +315,6 @@
   }
 });
 
-async function buscarOuAdicionarMusica(termo) {
-  const termoFormatado = termo.trim().toLowerCase();
-  const querySnap = await db.collection("musicasDisponiveis")
-    .where("titulo_lower", "==", termoFormatado)
-    .limit(1)
-    .get();
-
-  if (!querySnap.empty) {
-    return querySnap.docs[0].data(); // Já existe no banco
-  }
-
-  const resultado = await buscarVideoKaraokeNoYouTube(termo.replace(/\(.*?\)/g, '').replace(/-/g, '').trim());
-  if (!resultado) return null;
-
-  await db.collection("musicasDisponiveis").add({
-    titulo: resultado.titulo,
-    youtubeId: resultado.youtubeId,
-    titulo_lower: termoFormatado,
-    criadoEm: firebase.firestore.FieldValue.serverTimestamp()
-  });
-
-  carregarCatalogo();
-  return { titulo: resultado.titulo, youtubeId: resultado.youtubeId };
-}
-
 window.selecionarSugestao = function(youtubeId) {
   const musica = todasAsMusicas.find(m => m.youtubeId === youtubeId);
   if (musica) {
@@ -350,41 +325,26 @@ window.selecionarSugestao = function(youtubeId) {
 };
 
 
-async function buscarVideoKaraokeNoYouTube(termoOriginal) {
+ async function buscarVideoKaraokeNoYouTube(termoOriginal) {
   const apiKey = "AIzaSyDYAeknQpiJy5LfhGyOavpDaDHlUFjohio";
+  const termo = termoOriginal.replace(/\(.*?\)/g, '').replace(/-/g, ' ').trim();
 
-  const termoLimpo = termoOriginal
-    .replace(/\(.*?\)/g, '')
-    .replace(/-/g, ' ')
-    .trim();
-
-  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&order=viewCount&q=${encodeURIComponent(termoLimpo + ' karaoke')}&maxResults=10&key=${apiKey}`;
+  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&order=viewCount&q=${encodeURIComponent(termo + " karaoke")}&maxResults=10&key=${apiKey}`;
 
   try {
-    const res = await fetch(url);
-    const data = await res.json();
+    const response = await fetch(url);
+    const data = await response.json();
 
-    if (!data.items || data.items.length === 0) return null;
+    const item = data.items.find(i =>
+      !/acoustic|acústico|acustico|voz e violão|voz violao|cover|live/i.test(i.snippet.title.toLowerCase()) &&
+      i.snippet.title.toLowerCase().includes("karaoke")
+    );
 
-    const itemValido = data.items.find(i => {
-      const titulo = i.snippet.title.toLowerCase();
-
-      return (
-        !titulo.includes("acoustic") &&
-        !titulo.includes("acustico") &&
-        !titulo.includes("voz e violão") &&
-        !titulo.includes("voz violao") &&
-        !titulo.includes("cover") &&
-        !titulo.includes("live") &&
-        titulo.includes("karaoke")
-      );
-    });
-
-    if (!itemValido) return null;
+    if (!item) return null;
 
     return {
-      youtubeId: itemValido.id.videoId,
-      titulo: itemValido.snippet.title
+      youtubeId: item.id.videoId,
+      titulo: item.snippet.title
     };
   } catch (err) {
     console.error("❌ Erro ao buscar vídeo no YouTube:", err);
