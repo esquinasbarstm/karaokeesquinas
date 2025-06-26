@@ -116,10 +116,28 @@
     }
     th { background-color: #333; color: #fff; }
     td { background-color: #222; }
+    .header-info {
+      position: fixed;
+      top: 0;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      background: #000;
+      padding: 10px 20px;
+      z-index: 1000;
+      font-weight: bold;
+      font-size: 16px;
+    }
+    .header-info div { padding: 0 10px; }
   </style>
 </head>
 <body>
-  <h1>Escolha sua música 🎤</h1>
+  <div class="header-info">
+    <div id="musicaAtualInfo" style="color: lime;">🎤 Tocando agora: -</div>
+    <div id="proximaMusicaInfo" style="color: #ff5b5b;">⏭ Próxima: -</div>
+  </div>
+
+  <h1 style="margin-top:60px;">Escolha sua música 🎤</h1>
   <label>Mesa:</label>
   <input type="text" id="mesaInput" readonly style="background:#333; color:white;" />
   <div class="container">
@@ -159,8 +177,18 @@
     const mesaURL = params.get("mesa");
     if (mesaURL) { mesaInput.value = mesaURL; observarMusicas(); }
 
-    let todasAsMusicas = [];
+    const infoAtual = document.getElementById("musicaAtualInfo");
+    const infoProxima = document.getElementById("proximaMusicaInfo");
 
+    db.collection("sistema").doc("filaOrdenada").onSnapshot((doc) => {
+      const fila = doc.exists ? doc.data().musicas || [] : [];
+      const atual = fila[0];
+      const proxima = fila[1];
+      infoAtual.textContent = atual ? `🎤 Tocando agora: ${atual.musica} (Mesa ${atual.mesa})` : "🎤 Nenhuma música tocando";
+      infoProxima.textContent = proxima ? `⏭ Próxima: ${proxima.musica} (Mesa ${proxima.mesa})` : "⏭ Nenhuma próxima música";
+    });
+
+    let todasAsMusicas = [];
     async function carregarCatalogo() {
       const snapshot = await db.collection("musicasDisponiveis").get();
       todasAsMusicas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -180,11 +208,11 @@
     carregarCatalogo();
 
     searchInput.addEventListener("input", () => {
-      const texto = searchInput.value.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+      const texto = searchInput.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       suggestions.innerHTML = "";
       if (!texto || texto.length < 2) return;
       const filtradas = todasAsMusicas.filter(musica =>
-        musica.titulo.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").includes(texto)
+        musica.titulo.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(texto)
       );
       filtradas.forEach(musica => {
         const li = document.createElement("li");
