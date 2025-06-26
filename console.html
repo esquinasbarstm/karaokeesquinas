@@ -129,21 +129,37 @@
       });
     }
 
-    function renderizarCatalogo(lista) {
-      listaCatalogo.innerHTML = "";
-      lista.forEach((item) => {
-        const div = document.createElement("div");
-        div.className = "card";
-        div.innerHTML = `
-          <div>
-            <strong>${item.titulo}</strong><br/>
-            Artista: ${item.artista || 'Não informado'}<br/>
-            ID: ${item.youtubeId}
-          </div>
-        `;
-        listaCatalogo.appendChild(div);
-      });
-    }
+function renderizarCatalogo(lista) {
+  listaCatalogo.innerHTML = "";
+  lista.forEach((itemDoc) => {
+    const div = document.createElement("div");
+    div.className = "card";
+    div.innerHTML = `
+      <div>
+        <strong>${itemDoc.titulo}</strong><br/>
+        Artista: ${itemDoc.artista || 'Não informado'}<br/>
+        ID: ${itemDoc.youtubeId}<br/>
+        <a class="youtube-link" href="https://www.youtube.com/watch?v=${itemDoc.youtubeId}" target="_blank">▶️ Assistir</a><br/>
+        <button onclick="removerDoCatalogo('${itemDoc.id}')">🗑️ Excluir do Catálogo</button>
+      </div>
+    `;
+    listaCatalogo.appendChild(div);
+  });
+}
+
+async function removerDoCatalogo(id) {
+  if (!confirm("Tem certeza que deseja excluir essa música do catálogo?")) return;
+
+  try {
+    await db.collection("musicasDisponiveis").doc(id).delete();
+    alert("✅ Música removida do catálogo com sucesso!");
+  } catch (error) {
+    console.error("Erro ao remover do catálogo:", error);
+    alert("❌ Erro ao remover música do catálogo.");
+  }
+}
+
+
 
     async function removerDaFila(index) {
       try {
@@ -205,10 +221,13 @@
       renderizarHistorico(lista);
     });
 
-    db.collection("musicasDisponiveis").onSnapshot(snapshot => {
-      const lista = snapshot.docs.map(doc => doc.data());
-      renderizarCatalogo(lista);
-    });
+db.collection("musicasDisponiveis").onSnapshot(snapshot => {
+  const lista = snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  }));
+  renderizarCatalogo(lista);
+});
 
     async function buscarVideoKaraoke() {
       const termo = document.getElementById("buscaTermo").value.trim();
