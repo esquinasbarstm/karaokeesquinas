@@ -254,106 +254,75 @@ async function buscarOuAdicionarMusica(termo) {
 
   carregarCatalogo();
   return { titulo: resultado.titulo, youtubeId: resultado.youtubeId };
+}
 
-  async function buscarVideoKaraokeNoYouTube(termoOriginal) {
-    const apiKey = "AIzaSyDYAeknQpiJy5LfhGyOavpDaDHlUFjohio";
-    const termo = termoOriginal.replace(/\(.*?\)/g, '').replace(/-/g, ' ').trim();
-    const termoLower = termo.toLowerCase();
+async function buscarVideoKaraokeNoYouTube(termoOriginal) {
+  const apiKey = "AIzaSyDYAeknQpiJy5LfhGyOavpDaDHlUFjohio";
+  const termo = termoOriginal.replace(/\(.*?\)/g, '').replace(/-/g, ' ').trim();
+  const termoLower = termo.toLowerCase();
 
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(termo + ' karaoke')}&key=${apiKey}&maxResults=15&type=video&videoEmbeddable=true&order=viewCount`;
+  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(termo + ' karaoke')}&key=${apiKey}&maxResults=15&type=video&videoEmbeddable=true&order=viewCount`;
 
-    try {
-      const res = await fetch(url);
-      const data = await res.json();
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
 
-      if (data.items && data.items.length > 0) {
-        const karaokeValido = data.items.find(video => {
-          const titulo = video.snippet.title.toLowerCase();
-          return (
-            titulo.includes("karaoke") &&
-            (
-              titulo.includes(termoLower) ||
-              termoLower.split(" ").some(p => titulo.includes(p))
-            ) &&
-            !titulo.includes("cover") &&
-            !titulo.includes("live")
-          );
-        });
+    if (data.items && data.items.length > 0) {
+      const karaokeValido = data.items.find(video => {
+        const titulo = video.snippet.title.toLowerCase();
+        return (
+          titulo.includes("karaoke") &&
+          (
+            titulo.includes(termoLower) ||
+            termoLower.split(" ").some(p => titulo.includes(p))
+          ) &&
+          !titulo.includes("cover") &&
+          !titulo.includes("live")
+        );
+      });
 
-        if (karaokeValido) {
-          return {
-            youtubeId: karaokeValido.id.videoId,
-            titulo: karaokeValido.snippet.title
-          };
-        }
+      if (karaokeValido) {
+        return {
+          youtubeId: karaokeValido.id.videoId,
+          titulo: karaokeValido.snippet.title
+        };
       }
-    } catch (err) {
-      console.error("Erro ao buscar no YouTube:", err);
     }
-
-    return null;
+  } catch (err) {
+    console.error("Erro ao buscar no YouTube:", err);
   }
 
-  async function buscarOuAdicionarMusica(termo) {
-    const termoFormatado = termo.trim().toLowerCase();
+  return null;
+}
 
-    const querySnap = await db.collection("musicasDisponiveis")
-      .where("titulo_lower", "==", termoFormatado)
-      .limit(1)
-      .get();
+async function adicionarMusica(musica) {
+  const mesa = mesaInput.value.trim();
+  if (!mesa || isNaN(mesa)) return alert("Informe o número da mesa!");
 
-    if (!querySnap.empty) {
-      return querySnap.docs[0].data();
-    }
+  const mesaRef = db.collection("mesas").doc(mesa);
+  const snap = await mesaRef.get();
+  const musicas = snap.exists ? snap.data().musicas || [] : [];
 
-    const resultado = await buscarVideoKaraokeNoYouTube(
-      termo.replace(/\(.*?\)/g, '').replace(/-/g, '').trim()
-    );
-
-    if (!resultado) {
-      alert("Não foi possível encontrar uma versão de karaokê válida para essa música.");
-      return null;
-    }
-
-    await db.collection("musicasDisponiveis").add({
-      titulo: resultado.titulo,
-      youtubeId: resultado.youtubeId,
-      titulo_lower: termoFormatado,
-      criadoEm: firebase.firestore.FieldValue.serverTimestamp()
-    });
-
-    carregarCatalogo?.();
-    return { titulo: resultado.titulo, youtubeId: resultado.youtubeId };
+  if (musicas.length >= 2) {
+    alert("Você já adicionou 2 músicas. Aguarde tocar para adicionar mais.");
+    return;
   }
 
-  async function adicionarMusica(musica) {
-    const mesa = mesaInput.value.trim();
-    if (!mesa || isNaN(mesa)) return alert("Informe o número da mesa!");
+  await mesaRef.set({
+    musicas: firebase.firestore.FieldValue.arrayUnion(musica.titulo),
+    ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
 
-    const mesaRef = db.collection("mesas").doc(mesa);
-    const snap = await mesaRef.get();
-    const musicas = snap.exists ? snap.data().musicas || [] : [];
-
-    if (musicas.length >= 2) {
-      alert("Você já adicionou 2 músicas. Aguarde tocar para adicionar mais.");
-      return;
-    }
-
-    await mesaRef.set({
-      musicas: firebase.firestore.FieldValue.arrayUnion(musica.titulo),
-      ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-
-    await db.collection("sistema").doc("filaOrdenada").update({
-      musicas: firebase.firestore.FieldValue.arrayUnion({
-        mesa,
-        musica: musica.titulo,
-        youtubeId: musica.youtubeId,
-        link: `https://www.youtube.com/watch?v=${musica.youtubeId}`,
-        adicionadaEm: firebase.firestore.Timestamp.now()
-      })
-    });
-  }
+  await db.collection("sistema").doc("filaOrdenada").update({
+    musicas: firebase.firestore.FieldValue.arrayUnion({
+      mesa,
+      musica: musica.titulo,
+      youtubeId: musica.youtubeId,
+      link: `https://www.youtube.com/watch?v=${musica.youtubeId}`,
+      adicionadaEm: firebase.firestore.Timestamp.now()
+    })
+  });
+}
 
   function observarMusicas() {
     const mesa = mesaInput.value.trim();
@@ -406,8 +375,7 @@ async function buscarOuAdicionarMusica(termo) {
     tabelaBody.innerHTML = fila.map((m, i) => `
       <tr><td>${i + 1}</td><td>${m.musica || "-"}</td><td>${m.mesa || "-"}</td></tr>`).join("");
   });
-
-
+  
 </script>
 
 </body>
