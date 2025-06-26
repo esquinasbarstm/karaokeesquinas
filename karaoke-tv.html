@@ -57,9 +57,30 @@
       color: #0af;
       margin-bottom: 10px;
     }
+    .painel-esquerda, .painel-direita {
+      position: absolute;
+      top: 10px;
+      padding: 10px 16px;
+      background: rgba(0,0,0,0.7);
+      border-radius: 8px;
+      font-size: 18px;
+      font-weight: bold;
+      z-index: 10;
+    }
+    .painel-esquerda {
+      left: 10px;
+      color: lime;
+    }
+    .painel-direita {
+      right: 10px;
+      color: #ff5b5b;
+    }
   </style>
 </head>
 <body>
+  <div id="musicaAtual" class="painel-esquerda">🎤 Tocando agora: -</div>
+  <div id="proximaMusica" class="painel-direita">⏭ Próxima: -</div>
+
   <div id="info">Aguardando próxima música...</div>
   <div id="proxima"></div>
   <div id="video"></div>
@@ -86,6 +107,8 @@
 
     const infoDiv = document.getElementById("info");
     const proximaDiv = document.getElementById("proxima");
+    const musicaAtualDiv = document.getElementById("musicaAtual");
+    const proximaMusicaDiv = document.getElementById("proximaMusica");
     const tabelaBody = document.querySelector('#tabelaFila tbody');
     let player;
     let filaAtual = [];
@@ -95,6 +118,8 @@
       if (!filaAtual.length) {
         infoDiv.innerText = "Aguardando próxima música...";
         proximaDiv.innerText = "";
+        musicaAtualDiv.innerText = "🎤 Tocando agora: -";
+        proximaMusicaDiv.innerText = "⏭ Próxima: -";
         player?.stopVideo();
         musicaTocandoId = null;
       } else {
@@ -102,6 +127,8 @@
         const proxima = filaAtual[1];
         infoDiv.innerText = `🎤 Tocando agora: ${atual.musica} (Mesa ${atual.mesa})`;
         proximaDiv.innerText = proxima ? `🔜 Próxima: ${proxima.musica} (Mesa ${proxima.mesa})` : "";
+        musicaAtualDiv.innerText = `🎤 Tocando agora: ${atual.musica} (Mesa ${atual.mesa})`;
+        proximaMusicaDiv.innerText = proxima ? `⏭ Próxima: ${proxima.musica} (Mesa ${proxima.mesa})` : "⏭ Próxima: -";
       }
       atualizarTabela();
     }
