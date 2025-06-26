@@ -34,6 +34,92 @@
       font-weight: bold;
       cursor: pointer;
     }
+    .container { position: relative; width: 100%; max-width: 400px; }
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      width: 100%;
+      background: #222;
+      border-radius: 8px;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      z-index: 10;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    ul li {
+      padding: 10px;
+      cursor: pointer;
+    }
+    ul li:hover { background-color: #444; }
+    #minhasMusicas {
+      margin-top: 30px;
+      max-width: 400px;
+      width: 100%;
+    }
+    .musica-item {
+      background: #222;
+      border-radius: 8px;
+      padding: 10px;
+      margin: 5px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .musica-item button {
+      background: crimson;
+      padding: 6px 12px;
+      font-size: 14px;
+    }
+    #contador {
+      margin-top: 10px;
+      font-weight: bold;
+      color: #aaa;
+    }
+    #catalogoContainer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 20px;
+      justify-content: center;
+      max-width: 800px;
+    }
+    .catalogo-card {
+      background: #222;
+      border-radius: 8px;
+      padding: 10px;
+      width: 220px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      border: 1px solid #333;
+    }
+    .catalogo-card strong { font-size: 16px; color: #fff; }
+    .catalogo-card span { font-size: 14px; color: #aaa; margin-bottom: 6px; }
+    .catalogo-card button {
+      margin-top: auto;
+      padding: 6px 10px;
+      background: #ff0077;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    table {
+      margin-top: 40px;
+      width: 100%;
+      max-width: 600px;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 8px;
+      border: 1px solid #444;
+      text-align: center;
+    }
+    th { background-color: #333; color: #fff; }
+    td { background-color: #222; }
     .header-info {
       position: fixed;
       top: 0;
@@ -46,216 +132,248 @@
       font-weight: bold;
       font-size: 16px;
     }
-    #minhasMusicas, #catalogoContainer, #tabelaFila {
-      margin-top: 20px;
-      width: 100%;
-      max-width: 800px;
-    }
-    .musica-item {
-      background: #222;
-      border-radius: 8px;
-      padding: 10px;
-      margin: 5px 0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .catalogo-card {
-      background: #222;
-      border-radius: 8px;
-      padding: 10px;
-      margin: 5px;
-      width: calc(50% - 10px);
-      box-sizing: border-box;
-    }
-    .catalogo-card button {
-      background: #ff0077;
-      border: none;
-      padding: 6px 10px;
-      border-radius: 6px;
-      cursor: pointer;
-      margin-top: 5px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-    }
-    th, td {
-      border: 1px solid #444;
-      padding: 6px;
-      text-align: center;
-    }
-    th {
-      background-color: #333;
-    }
-    td {
-      background-color: #222;
-    }
+    .header-info div { padding: 0 10px; }
   </style>
 </head>
 <body>
   <div class="header-info">
-    <div id="musicaAtualInfo">🎤 Tocando agora: -</div>
-    <div id="proximaMusicaInfo">⏭ Próxima: -</div>
+    <div id="musicaAtualInfo" style="color: lime;">🎤 Tocando agora: -</div>
+    <div id="proximaMusicaInfo" style="color: #ff5b5b;">⏭ Próxima: -</div>
   </div>
 
   <h1 style="margin-top:60px;">Escolha sua música 🎤</h1>
-  <input type="text" id="mesaInput" placeholder="Número da mesa" />
-  <input type="text" id="searchInput" placeholder="Digite a música e aperte ENTER" />
+  <label>Mesa:</label>
+  <input type="text" id="mesaInput" placeholder="Digite o número da mesa" />
+  <div class="container">
+    <input id="searchInput" placeholder="Digite o nome da música..." autocomplete="off" />
+    <ul id="suggestions"></ul>
+  </div>
   <div id="contador">🎵 Músicas adicionadas: 0 / 2</div>
+  <div id="minhasMusicas">
+    <h3>🎶 Suas músicas:</h3>
+    <div id="listaMusicas"></div>
+  </div>
+  <h3>📚 Catálogo completo:</h3>
+  <div id="catalogoContainer"></div>
+  <h3>📊 Fila Geral (ao vivo)</h3>
+  <table id="tabelaFila">
+    <thead><tr><th>#</th><th>Música</th><th>Mesa</th></tr></thead>
+    <tbody></tbody>
+  </table>
 
-  <div id="minhasMusicas"><h3>🎶 Suas músicas:</h3><div id="listaMusicas"></div></div>
-  <h3>📚 Catálogo:</h3><div id="catalogoContainer"></div>
-  <h3>📊 Fila Geral:</h3>
-  <table id="tabelaFila"><thead><tr><th>#</th><th>Música</th><th>Mesa</th></tr></thead><tbody></tbody></table>
-
+ <!-- 🔧 Apenas substitua sua tag <script> atual por essa versão atualizada: -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyBGkT5z6i3KycQHvuutOYiUOeX1hDG15lw",
-  authDomain: "esquina-s-karaoke.firebaseapp.com",
-  projectId: "esquina-s-karaoke"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+  const firebaseConfig = {
+    apiKey: "AIzaSyBGkT5z6i3KycQHvuutOYiUOeX1hDG15lw",
+    authDomain: "esquina-s-karaoke.firebaseapp.com",
+    projectId: "esquina-s-karaoke"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
 
-const mesaInput = document.getElementById("mesaInput");
-const searchInput = document.getElementById("searchInput");
-const listaMusicas = document.getElementById("listaMusicas");
-const contador = document.getElementById("contador");
+  const mesaInput = document.getElementById("mesaInput");
+  const searchInput = document.getElementById("searchInput");
+  const suggestions = document.getElementById("suggestions");
+  const listaMusicas = document.getElementById("listaMusicas");
+  const contador = document.getElementById("contador");
+  const params = new URLSearchParams(window.location.search);
+  const mesaURL = params.get("mesa");
+  if (mesaURL) { mesaInput.value = mesaURL; observarMusicas(); }
 
-const musicaAtualInfo = document.getElementById("musicaAtualInfo");
-const proximaMusicaInfo = document.getElementById("proximaMusicaInfo");
+  const infoAtual = document.getElementById("musicaAtualInfo");
+  const infoProxima = document.getElementById("proximaMusicaInfo");
 
-const tabelaBody = document.querySelector("#tabelaFila tbody");
-const catalogoContainer = document.getElementById("catalogoContainer");
+  db.collection("sistema").doc("filaOrdenada").onSnapshot((doc) => {
+    const fila = doc.exists ? doc.data().musicas || [] : [];
+    const atual = fila[0];
+    const proxima = fila[1];
+    infoAtual.textContent = atual ? `🎤 Tocando agora: ${atual.musica} (Mesa ${atual.mesa})` : "🎤 Nenhuma música tocando";
+    infoProxima.textContent = proxima ? `⏭ Próxima: ${proxima.musica} (Mesa ${proxima.mesa})` : "⏭ Nenhuma próxima música";
+  });
 
-let mesa = "";
+  let todasAsMusicas = [];
 
-mesaInput.addEventListener("input", () => {
-  mesa = mesaInput.value.trim();
-  observarFilaMesa();
-});
-
-searchInput.addEventListener("keydown", async (e) => {
-  if (e.key === "Enter") {
-    const termo = searchInput.value.trim();
-    if (!termo || !mesa) return;
-    const snap = await db.collection("sistema").doc("filaOrdenada").get();
-    const fila = snap.exists ? snap.data().musicas || [] : [];
-    const minhas = fila.filter(m => m.mesa === mesa);
-    if (minhas.length >= 2) {
-      alert("Você já adicionou 2 músicas. Aguarde tocar para adicionar mais.");
-      return;
-    }
-
-    let musica = await buscarMusicaNoCatalogo(termo);
-    if (!musica) {
-      musica = await buscarVideoKaraokeYT(termo);
-      if (!musica) return alert("Não encontramos um karaokê válido.");
-      await db.collection("musicasDisponiveis").add({
-        titulo: musica.titulo,
-        youtubeId: musica.youtubeId,
-        criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
-        titulo_lower: termo.toLowerCase()
-      });
-    }
-
-    await db.collection("sistema").doc("filaOrdenada").update({
-      musicas: firebase.firestore.FieldValue.arrayUnion({
-        mesa: mesa,
-        musica: musica.titulo,
-        youtubeId: musica.youtubeId,
-        link: `https://www.youtube.com/watch?v=${musica.youtubeId}`,
-        adicionadaEm: firebase.firestore.Timestamp.now()
-      })
+  async function carregarCatalogo() {
+    const snapshot = await db.collection("musicasDisponiveis").get();
+    todasAsMusicas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const container = document.getElementById("catalogoContainer");
+    container.innerHTML = "";
+    todasAsMusicas.forEach(musica => {
+      const card = document.createElement("div");
+      card.className = "catalogo-card";
+      card.innerHTML = `
+        <strong>${musica.titulo}</strong>
+        <span>${musica.artista || ''}</span>
+        <button>Adicionar</button>`;
+      card.querySelector('button').onclick = () => adicionarMusica(musica);
+      container.appendChild(card);
     });
-    searchInput.value = "";
+  }
+  carregarCatalogo();
+
+  searchInput.addEventListener("keydown", async (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const texto = searchInput.value.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    if (!texto || texto.length < 2) return;
+
+    const musica = await buscarOuAdicionarMusica(texto);
+    if (musica) {
+      adicionarMusica(musica);
+      searchInput.value = "";
+      suggestions.innerHTML = "";
+    } else {
+      alert("Não foi possível encontrar uma versão de karaokê válida para essa música.");
+    }
   }
 });
 
-async function buscarMusicaNoCatalogo(termo) {
-  const snap = await db.collection("musicasDisponiveis")
-    .where("titulo_lower", "==", termo.toLowerCase())
+async function buscarOuAdicionarMusica(termo) {
+  const termoFormatado = termo.trim().toLowerCase();
+  const querySnap = await db.collection("musicasDisponiveis")
+    .where("titulo_lower", "==", termoFormatado)
+    .limit(1)
     .get();
-  if (!snap.empty) return snap.docs[0].data();
+
+  if (!querySnap.empty) {
+    return querySnap.docs[0].data(); // Já existe no banco
+  }
+
+  const resultado = await buscarVideoKaraokeNoYouTube(termo);
+  if (!resultado) return null;
+
+  await db.collection("musicasDisponiveis").add({
+    titulo: resultado.titulo,
+    youtubeId: resultado.youtubeId,
+    titulo_lower: termoFormatado,
+    criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+  });
+
+  carregarCatalogo();
+  return { titulo: resultado.titulo, youtubeId: resultado.youtubeId };
+}
+
+async function buscarVideoKaraokeNoYouTube(termo) {
+  const apiKey = "AIzaSyDYAeknQpiJy5LfhGyOavpDaDHlUFjohio";
+  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(termo + ' karaoke')}&key=${apiKey}&maxResults=15&type=video&videoEmbeddable=true&order=viewCount`;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.items && data.items.length > 0) {
+      const karaokeValido = data.items.find(v => {
+        const titulo = v.snippet.title.toLowerCase();
+        return (
+          titulo.includes("karaoke") &&
+          !titulo.includes("acoustic") &&
+          !titulo.includes("acustico") &&
+          !titulo.includes("voz e violão") &&
+          !titulo.includes("voz violao") &&
+          !titulo.includes("cover") &&
+          !titulo.includes("live")
+        );
+      });
+
+      if (karaokeValido) {
+        return {
+          youtubeId: karaokeValido.id.videoId,
+          titulo: karaokeValido.snippet.title
+        };
+      }
+    }
+  } catch (err) {
+    console.error("Erro ao buscar no YouTube:", err);
+  }
+
   return null;
 }
 
-async function buscarVideoKaraokeYT(termo) {
-  const apiKey = "AIzaSyDYAeknQpiJy5LfhGyOavpDaDHlUFjohio";
-  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(termo + ' karaoke')}&key=${apiKey}&maxResults=10&type=video&videoEmbeddable=true&order=viewCount`;
-  const res = await fetch(url);
-  const data = await res.json();
-  const item = data.items.find(v => {
-    const t = v.snippet.title.toLowerCase();
-    return t.includes("karaoke") && !t.includes("cover") && !t.includes("live") && !t.includes("acustico") && !t.includes("acoustic") && !t.includes("voz e violão") && !t.includes("acústico");
-  });
-  if (!item) return null;
-  return {
-    titulo: item.snippet.title,
-    youtubeId: item.id.videoId
-  };
-}
+async function adicionarMusica(musica) {
+  const mesa = mesaInput.value.trim();
+  if (!mesa || isNaN(mesa)) return alert("Informe o número da mesa!");
 
-function observarFilaMesa() {
-  db.collection("sistema").doc("filaOrdenada").onSnapshot(doc => {
-    const fila = doc.exists ? doc.data().musicas || [] : [];
-    const minhas = fila.filter(m => m.mesa === mesa);
-    listaMusicas.innerHTML = minhas.map(m => `
-      <div class="musica-item">
-        <span>${m.musica}</span>
-        <button onclick="removerMusica('${m.musica}')">Remover</button>
-      </div>`).join("");
-    contador.textContent = `🎵 Músicas adicionadas: ${minhas.length} / 2`;
-    tabelaBody.innerHTML = fila.map((m, i) => `
-      <tr><td>${i+1}</td><td>${m.musica}</td><td>${m.mesa}</td></tr>
-    `).join("");
-    musicaAtualInfo.textContent = fila[0] ? `🎤 Tocando agora: ${fila[0].musica} (Mesa ${fila[0].mesa})` : "🎤 Nenhuma música tocando";
-    proximaMusicaInfo.textContent = fila[1] ? `⏭ Próxima: ${fila[1].musica} (Mesa ${fila[1].mesa})` : "⏭ Nenhuma próxima música";
-  });
-}
+  const mesaRef = db.collection("mesas").doc(mesa);
+  const snap = await mesaRef.get();
+  const musicas = snap.exists ? snap.data().musicas || [] : [];
 
-async function removerMusica(titulo) {
-  const snap = await db.collection("sistema").doc("filaOrdenada").get();
-  const fila = snap.exists ? snap.data().musicas || [] : [];
-  const novaFila = fila.filter(m => !(m.mesa === mesa && m.musica === titulo));
-  await db.collection("sistema").doc("filaOrdenada").set({ musicas: novaFila }, { merge: true });
-}
-window.removerMusica = removerMusica;
+  if (musicas.length >= 2) {
+    alert("Você já adicionou 2 músicas. Aguarde tocar para adicionar mais.");
+    return;
+  }
 
-async function carregarCatalogo() {
-  const snap = await db.collection("musicasDisponiveis").get();
-  catalogoContainer.innerHTML = "";
-  snap.forEach(doc => {
-    const d = doc.data();
-    const div = document.createElement("div");
-    div.className = "catalogo-card";
-    div.innerHTML = `<strong>${d.titulo}</strong><br>
-      <button onclick='adicionarMusicaDireta("${d.titulo}", "${d.youtubeId}")'>Adicionar</button>`;
-    catalogoContainer.appendChild(div);
-  });
-}
-async function adicionarMusicaDireta(titulo, youtubeId) {
-  if (!mesa) return alert("Informe sua mesa.");
-  const snap = await db.collection("sistema").doc("filaOrdenada").get();
-  const fila = snap.exists ? snap.data().musicas || [] : [];
-  const minhas = fila.filter(m => m.mesa === mesa);
-  if (minhas.length >= 2) return alert("Você já tem 2 músicas.");
+  await mesaRef.set({
+    musicas: firebase.firestore.FieldValue.arrayUnion(musica.titulo),
+    ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
+  }, { merge: true });
+
   await db.collection("sistema").doc("filaOrdenada").update({
     musicas: firebase.firestore.FieldValue.arrayUnion({
-      mesa: mesa,
-      musica: titulo,
-      youtubeId: youtubeId,
-      link: `https://www.youtube.com/watch?v=${youtubeId}`,
+      mesa,
+      musica: musica.titulo,
+      youtubeId: musica.youtubeId,
+      link: `https://www.youtube.com/watch?v=${musica.youtubeId}`,
       adicionadaEm: firebase.firestore.Timestamp.now()
     })
   });
 }
-carregarCatalogo();
+
+function observarMusicas() {
+  const mesa = mesaInput.value.trim();
+  if (!mesa || isNaN(mesa)) return;
+
+  db.collection("mesas").doc(mesa).onSnapshot((docSnap) => {
+    const musicas = docSnap.exists ? docSnap.data().musicas || [] : [];
+    renderizarLista(musicas);
+    contador.textContent = `🎵 Músicas adicionadas: ${musicas.length} / 2`;
+  });
+}
+
+function renderizarLista(musicas) {
+  listaMusicas.innerHTML = "";
+  if (musicas.length === 0) {
+    listaMusicas.innerHTML = "<p>Nenhuma música adicionada ainda.</p>";
+    return;
+  }
+
+  musicas.forEach((titulo) => {
+    const div = document.createElement("div");
+    div.className = "musica-item";
+    div.innerHTML = `<span>${titulo}</span>
+      <button onclick="removerMusica('${titulo}')">Remover</button>`;
+    listaMusicas.appendChild(div);
+  });
+}
+
+async function removerMusica(titulo) {
+  const mesa = mesaInput.value.trim();
+  if (!mesa || isNaN(mesa)) return;
+
+  await db.collection("mesas").doc(mesa).update({
+    musicas: firebase.firestore.FieldValue.arrayRemove(titulo),
+    ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
+  });
+
+  const filaRef = db.collection("sistema").doc("filaOrdenada");
+  const snap = await filaRef.get();
+  const atual = snap.exists ? snap.data().musicas || [] : [];
+  const nova = atual.filter(m => !(m.mesa === mesa && m.musica === titulo));
+  await filaRef.set({ musicas: nova }, { merge: true });
+}
+window.removerMusica = removerMusica;
+
+const tabelaBody = document.querySelector("#tabelaFila tbody");
+db.collection("sistema").doc("filaOrdenada").onSnapshot(doc => {
+  const dados = doc.data();
+  const fila = dados?.musicas || [];
+  tabelaBody.innerHTML = fila.map((m, i) => `
+    <tr><td>${i + 1}</td><td>${m.musica || "-"}</td><td>${m.mesa || "-"}</td></tr>`).join("");
+});
+
 </script>
+
 </body>
 </html>
