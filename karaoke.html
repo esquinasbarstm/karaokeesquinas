@@ -259,8 +259,14 @@ async function buscarOuAdicionarMusica(termo) {
 async function buscarVideoKaraokeNoYouTube(termoOriginal) {
   const apiKey = "AIzaSyDYAeknQpiJy5LfhGyOavpDaDHlUFjohio";
 
+  // Limpeza de parênteses, hífens e espaços extras
   const termo = termoOriginal.replace(/\(.*?\)/g, '').replace(/-/g, ' ').trim();
   const termoLower = termo.toLowerCase();
+
+  const palavrasBloqueadas = [
+    "acoustic", "acustico", "voz e violão", "voz violao",
+    "cover", "live", "ao vivo", "carpool", "reaction", "making of"
+  ];
 
   const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(termo + ' karaoke')}&key=${apiKey}&maxResults=15&type=video&videoEmbeddable=true&order=viewCount`;
 
@@ -269,23 +275,14 @@ async function buscarVideoKaraokeNoYouTube(termoOriginal) {
     const data = await res.json();
 
     if (data.items && data.items.length > 0) {
-      // Ordena por relevância e viewCount já feito pela API
       const karaokeValido = data.items.find(video => {
         const titulo = video.snippet.title.toLowerCase();
 
-        return (
-          titulo.includes("karaoke") &&
-          (
-            titulo.includes(termoLower) || // termo completo
-            termoLower.split(" ").some(p => titulo.includes(p)) // ou partes do termo
-          ) &&
-          !titulo.includes("acoustic") &&
-          !titulo.includes("acustico") &&
-          !titulo.includes("voz e violão") &&
-          !titulo.includes("voz violao") &&
-          !titulo.includes("cover") &&
-          !titulo.includes("live")
-        );
+        const contemKaraoke = titulo.includes("karaoke") || titulo.includes("karaokê");
+        const contemTermo = titulo.includes(termoLower) || termoLower.split(" ").some(p => titulo.includes(p));
+        const bloqueado = palavrasBloqueadas.some(palavra => titulo.includes(palavra));
+
+        return contemKaraoke && contemTermo && !bloqueado;
       });
 
       if (karaokeValido) {
@@ -296,11 +293,12 @@ async function buscarVideoKaraokeNoYouTube(termoOriginal) {
       }
     }
   } catch (err) {
-    console.error("Erro ao buscar no YouTube:", err);
+    console.error("❌ Erro ao buscar no YouTube:", err);
   }
 
   return null;
 }
+
 
 async function buscarOuAdicionarMusica(termo) {
   const termoFormatado = termo.trim().toLowerCase();
