@@ -49,11 +49,10 @@
   <h1>🎶 Console do Karaokê</h1>
 
   <section class="catalogo">
-    <h2>Adicionar Música ao Catálogo</h2>
-    <input id="titulo" placeholder="Título da música" />
-    <input id="artista" placeholder="Artista" />
-    <input id="youtubeId" placeholder="ID do YouTube" maxlength="11" />
-    <button onclick="adicionarAoCatalogo()">Adicionar</button>
+    <h2>🔎 Buscar no YouTube (versão karaoke)</h2>
+    <input id="buscaTermo" placeholder="Digite o nome da música..." />
+    <button onclick="buscarVideoKaraoke()">Buscar e Adicionar</button>
+    <div id="resultadoBusca"></div>
   </section>
 
   <section class="fila">
@@ -146,25 +145,6 @@
       });
     }
 
-    function adicionarAoCatalogo() {
-      const titulo = document.getElementById("titulo").value.trim();
-      const artista = document.getElementById("artista").value.trim();
-      const youtubeId = document.getElementById("youtubeId").value.trim();
-      if (!titulo || youtubeId.length !== 11) {
-        alert("Preencha corretamente os campos.");
-        return;
-      }
-      db.collection("musicasDisponiveis").add({
-        titulo, artista, youtubeId,
-        link: `https://www.youtube.com/watch?v=${youtubeId}`
-      }).then(() => {
-        document.getElementById("titulo").value = "";
-        document.getElementById("artista").value = "";
-        document.getElementById("youtubeId").value = "";
-        alert("✅ Música adicionada ao catálogo!");
-      });
-    }
-
     async function removerDaFila(index) {
       try {
         const docRef = await db.collection("sistema").doc("filaOrdenada").get();
@@ -229,6 +209,45 @@
       const lista = snapshot.docs.map(doc => doc.data());
       renderizarCatalogo(lista);
     });
+
+    async function buscarVideoKaraoke() {
+      const termo = document.getElementById("buscaTermo").value.trim();
+      if (!termo) return alert("Digite um termo para buscar.");
+
+      const apiKey = "AIzaSyDYAeknQpiJy5LfhGyOavpDaDHlUFjohio";
+      const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${encodeURIComponent(termo + " karaoke")}&maxResults=10&key=${apiKey}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      const item = data.items.find(i =>
+        !/acoustic|acústico|acustico|voz e violão|cover|live/i.test(i.snippet.title)
+      );
+
+      if (!item) return alert("Nenhum vídeo apropriado encontrado.");
+
+      const titulo = item.snippet.title;
+      const youtubeId = item.id.videoId;
+
+      // Verifica se já existe no catálogo
+      const jaExiste = await db.collection("musicasDisponiveis")
+        .where("youtubeId", "==", youtubeId).get();
+
+      if (!jaExiste.empty) {
+        document.getElementById("resultadoBusca").innerHTML = `⚠️ Já existe no catálogo: <strong>${titulo}</strong>`;
+        return;
+      }
+
+      await db.collection("musicasDisponiveis").add({
+        titulo,
+        artista: "",
+        youtubeId,
+        link: `https://www.youtube.com/watch?v=${youtubeId}`,
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      document.getElementById("resultadoBusca").innerHTML = `✅ Adicionado: <strong>${titulo}</strong> <a href="https://www.youtube.com/watch?v=${youtubeId}" target="_blank">▶️ Ver</a>`;
+      document.getElementById("buscaTermo").value = "";
+    }
   </script>
 </body>
 </html>
