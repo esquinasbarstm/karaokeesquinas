@@ -259,14 +259,8 @@ async function buscarOuAdicionarMusica(termo) {
 async function buscarVideoKaraokeNoYouTube(termoOriginal) {
   const apiKey = "AIzaSyDYAeknQpiJy5LfhGyOavpDaDHlUFjohio";
 
-  // Limpeza de parênteses, hífens e espaços extras
   const termo = termoOriginal.replace(/\(.*?\)/g, '').replace(/-/g, ' ').trim();
   const termoLower = termo.toLowerCase();
-
-  const palavrasBloqueadas = [
-    "acoustic", "acustico", "voz e violão", "voz violao",
-    "cover", "live", "ao vivo", "carpool", "reaction", "making of"
-  ];
 
   const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(termo + ' karaoke')}&key=${apiKey}&maxResults=15&type=video&videoEmbeddable=true&order=viewCount`;
 
@@ -278,11 +272,15 @@ async function buscarVideoKaraokeNoYouTube(termoOriginal) {
       const karaokeValido = data.items.find(video => {
         const titulo = video.snippet.title.toLowerCase();
 
-        const contemKaraoke = titulo.includes("karaoke") || titulo.includes("karaokê");
-        const contemTermo = titulo.includes(termoLower) || termoLower.split(" ").some(p => titulo.includes(p));
-        const bloqueado = palavrasBloqueadas.some(palavra => titulo.includes(palavra));
-
-        return contemKaraoke && contemTermo && !bloqueado;
+        return (
+          titulo.includes("karaoke") &&
+          (
+            titulo.includes(termoLower) ||
+            termoLower.split(" ").some(p => titulo.includes(p))
+          ) &&
+          !titulo.includes("cover") &&
+          !titulo.includes("live")
+        );
       });
 
       if (karaokeValido) {
@@ -293,12 +291,11 @@ async function buscarVideoKaraokeNoYouTube(termoOriginal) {
       }
     }
   } catch (err) {
-    console.error("❌ Erro ao buscar no YouTube:", err);
+    console.error("Erro ao buscar no YouTube:", err);
   }
 
   return null;
 }
-
 
 async function buscarOuAdicionarMusica(termo) {
   const termoFormatado = termo.trim().toLowerCase();
@@ -312,7 +309,10 @@ async function buscarOuAdicionarMusica(termo) {
     return querySnap.docs[0].data();
   }
 
-  const resultado = await buscarVideoKaraokeNoYouTube(termo);
+  const resultado = await buscarVideoKaraokeNoYouTube(
+    termo.replace(/\(.*?\)/g, '').replace(/-/g, '').trim()
+  );
+
   if (!resultado) {
     alert("Não foi possível encontrar uma versão de karaokê válida para essa música.");
     return null;
@@ -326,7 +326,6 @@ async function buscarOuAdicionarMusica(termo) {
   });
 
   carregarCatalogo?.();
-
   return { titulo: resultado.titulo, youtubeId: resultado.youtubeId };
 }
 
