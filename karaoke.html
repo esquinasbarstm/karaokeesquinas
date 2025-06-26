@@ -251,24 +251,35 @@
   }
 
   async function buscarVideoKaraokeNoYouTube(termo) {
-    const apiKey = "AIzaSyDYAeknQpiJy5LfhGyOavpDaDHlUFjohio";
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(termo)}&key=${apiKey}&maxResults=1&type=video&videoEmbeddable=true&order=viewCount`;
+  const apiKey = "AIzaSyDYAeknQpiJy5LfhGyOavpDaDHlUFjohio";
+  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(termo + ' karaoke')}&key=${apiKey}&maxResults=10&type=video&videoEmbeddable=true&order=viewCount`;
 
-    try {
-      const res = await fetch(url);
-      const data = await res.json();
-      if (data.items && data.items.length > 0) {
-        const video = data.items[0];
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.items && data.items.length > 0) {
+      const karaokeValido = data.items.find(v => {
+        const titulo = v.snippet.title.toLowerCase();
+        return (
+          titulo.includes("karaoke") &&
+          !titulo.includes("cover") &&
+          !titulo.includes("live")
+        );
+      });
+
+      if (karaokeValido) {
         return {
-          youtubeId: video.id.videoId,
-          titulo: video.snippet.title
+          youtubeId: karaokeValido.id.videoId,
+          titulo: karaokeValido.snippet.title
         };
       }
-    } catch (err) {
-      console.error("Erro ao buscar no YouTube:", err);
     }
-    return null;
+  } catch (err) {
+    console.error("Erro ao buscar no YouTube:", err);
   }
+
+  return null;
+}
 
   async function adicionarMusica(musica) {
     const mesa = mesaInput.value.trim();
