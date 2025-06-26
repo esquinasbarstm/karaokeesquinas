@@ -426,20 +426,63 @@ async function buscarOuAdicionarMusica(termo) {
   return { titulo: resultado.titulo, youtubeId: resultado.youtubeId };
 }
 
+async function reorganizarFilaPorRodizio() {
+  const filaRef = await db.collection("sistema").doc("filaOrdenada").get();
+  const filaAtual = filaRef.exists ? filaRef.data().musicas || [] : [];
+
+  // Agrupar músicas por mesa
+  const mesas = {};
+  filaAtual.forEach(m => {
+    if (!mesas[m.mesa]) mesas[m.mesa] = [];
+    mesas[m.mesa].push(m);
+  });
+
+  // Dividir cada mesa em blocos de até 2 músicas
+  const blocosPorMesa = {};
+  for (const mesa in mesas) {
+    blocosPorMesa[mesa] = [];
+    const musicas = mesas[mesa];
+    for (let i = 0; i < musicas.length; i += 2) {
+      blocosPorMesa[mesa].push(musicas.slice(i, i + 2));
+    }
+  }
+
+  // Reorganizar a fila em rodízio de blocos
+  const novaFila = [];
+  let terminou = false;
+  let rodada = 0;
+
+  while (!terminou) {
+    terminou = true;
+    for (const mesa in blocosPorMesa) {
+      const bloco = blocosPorMesa[mesa][rodada];
+      if (bloco) {
+        novaFila.push(...bloco);
+        terminou = false;
+      }
+    }
+    rodada++;
+  }
+
+  // Atualiza a fila no Firestore
+  await db.collection("sistema").doc("filaOrdenada").set({ musicas: novaFila });
+}
+
+
 async function adicionarMusica(musica) {
   const mesa = mesaInput.value.trim();
   if (!mesa || isNaN(mesa)) return alert("Informe o número da mesa!");
 
-const filaRef = await db.collection("sistema").doc("filaOrdenada").get();
-const fila = filaRef.exists ? filaRef.data().musicas || [] : [];
+  const filaRef = await db.collection("sistema").doc("filaOrdenada").get();
+  const fila = filaRef.exists ? filaRef.data().musicas || [] : [];
 
-const musicasDaMesa = fila.filter(m => m.mesa === mesa);
+  const musicasDaMesa = fila.filter(m => m.mesa === mesa);
+  if (musicasDaMesa.length >= 2) {
+    alert("Você já adicionou 2 músicas. Aguarde as duas tocarem para adicionar mais.");
+    return;
+  }
 
-if (musicasDaMesa.length >= 2) {
-  alert("Você já adicionou 2 músicas. Aguarde as duas tocarem para adicionar mais.");
-  return;
-}
-
+  const mesaRef = db.collection("mesas").doc(mesa); // 🔧 ESSA LINHA É ESSENCIAL
 
   await mesaRef.set({
     musicas: firebase.firestore.FieldValue.arrayUnion(musica.titulo),
@@ -455,7 +498,10 @@ if (musicasDaMesa.length >= 2) {
       adicionadaEm: firebase.firestore.Timestamp.now()
     })
   });
+
+  await reorganizarFilaPorRodizio(); // ✅ ORGANIZA APÓS ADICIONAR
 }
+
 
 function observarMusicas() {
   const mesa = mesaInput.value.trim();
