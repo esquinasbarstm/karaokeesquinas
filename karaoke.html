@@ -242,7 +242,7 @@ async function buscarOuAdicionarMusica(termo) {
     return querySnap.docs[0].data(); // Já existe no banco
   }
 
-  const resultado = await buscarVideoKaraokeNoYouTube(termo);
+  const resultado = await buscarVideoKaraokeNoYouTube(termo.replace(/\(.*?\)/g, '').replace(/-/g, '').trim());
   if (!resultado) return null;
 
   await db.collection("musicasDisponiveis").add({
