@@ -132,6 +132,27 @@
       font-weight: bold;
       font-size: 16px;
     }
+
+    #suggestions {
+  background: #222;
+  border: 1px solid #444;
+  max-width: 400px;
+  margin-top: -8px;
+  margin-bottom: 10px;
+  width: 100%;
+  z-index: 10;
+}
+
+.sugestao {
+  padding: 10px;
+  cursor: pointer;
+  border-bottom: 1px solid #333;
+}
+
+.sugestao:hover {
+  background: #333;
+}
+
     .header-info div { padding: 0 10px; }
   </style>
 </head>
@@ -214,6 +235,23 @@
   }
   carregarCatalogo();
 
+  searchInput.addEventListener("input", () => {
+  const texto = searchInput.value.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  if (texto.length < 2) {
+    suggestions.innerHTML = "";
+    return;
+  }
+
+  const filtradas = todasAsMusicas.filter(m =>
+    m.titulo.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").includes(texto)
+  ).slice(0, 5); // máximo 5 sugestões
+
+  suggestions.innerHTML = filtradas.map(m => `
+    <div class="sugestao" onclick="selecionarSugestao('${m.youtubeId}')">${m.titulo}</div>
+  `).join("");
+});
+
+
   searchInput.addEventListener("keydown", async (e) => {
   if (e.key === "Enter") {
     e.preventDefault();
@@ -255,6 +293,16 @@ async function buscarOuAdicionarMusica(termo) {
   carregarCatalogo();
   return { titulo: resultado.titulo, youtubeId: resultado.youtubeId };
 }
+
+window.selecionarSugestao = function(youtubeId) {
+  const musica = todasAsMusicas.find(m => m.youtubeId === youtubeId);
+  if (musica) {
+    adicionarMusica(musica);
+    searchInput.value = "";
+    suggestions.innerHTML = "";
+  }
+};
+
 
 async function buscarVideoKaraokeNoYouTube(termoOriginal) {
   const apiKey = "AIzaSyDYAeknQpiJy5LfhGyOavpDaDHlUFjohio";
