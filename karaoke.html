@@ -242,7 +242,7 @@ async function buscarOuAdicionarMusica(termo) {
     return querySnap.docs[0].data(); // Já existe no banco
   }
 
-    const resultado = await buscarVideoKaraokeNoYouTube(termo.replace(/\(.*?\)/g, '').replace(/-/g, '').trim());
+  const resultado = await buscarVideoKaraokeNoYouTube(termo.replace(/\(.*?\)/g, '').replace(/-/g, '').trim());
   if (!resultado) return null;
 
   await db.collection("musicasDisponiveis").add({
@@ -254,8 +254,9 @@ async function buscarOuAdicionarMusica(termo) {
 
   carregarCatalogo();
   return { titulo: resultado.titulo, youtubeId: resultado.youtubeId };
+}
 
-  async function buscarVideoKaraokeNoYouTube(termoOriginal) {
+async function buscarVideoKaraokeNoYouTube(termoOriginal) {
     const apiKey = "AIzaSyDYAeknQpiJy5LfhGyOavpDaDHlUFjohio";
     const termo = termoOriginal.replace(/\(.*?\)/g, '').replace(/-/g, ' ').trim();
     const termoLower = termo.toLowerCase();
@@ -344,15 +345,15 @@ async function buscarOuAdicionarMusica(termo) {
       ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
 
-    await db.collection("sistema").doc("filaOrdenada").update({
-      musicas: firebase.firestore.FieldValue.arrayUnion({
-        mesa,
-        musica: musica.titulo,
-        youtubeId: musica.youtubeId,
-        link: `https://www.youtube.com/watch?v=${musica.youtubeId}`,
-        adicionadaEm: firebase.firestore.Timestamp.now()
-      })
-    });
+    await db.collection("sistema").doc("filaOrdenada").set({
+  musicas: firebase.firestore.FieldValue.arrayUnion({
+    mesa,
+    musica: musica.titulo,
+    youtubeId: musica.youtubeId,
+    link: `https://www.youtube.com/watch?v=${musica.youtubeId}`,
+    adicionadaEm: firebase.firestore.Timestamp.now()
+  })
+}, { merge: true });
   }
 
   function observarMusicas() {
@@ -407,6 +408,7 @@ async function buscarOuAdicionarMusica(termo) {
       <tr><td>${i + 1}</td><td>${m.musica || "-"}</td><td>${m.mesa || "-"}</td></tr>`).join("");
   });
 
+  // Sugestões automáticas enquanto digita
   searchInput.addEventListener("input", () => {
     const termo = searchInput.value.trim().toLowerCase();
     suggestions.innerHTML = "";
@@ -433,7 +435,7 @@ async function buscarOuAdicionarMusica(termo) {
       suggestions.innerHTML = "";
     }
   });
-
+  
 </script>
 
 </body>
