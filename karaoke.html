@@ -38,12 +38,16 @@
     ul {
       list-style: none;
       padding: 0;
-      max-width: 400px;
+      margin: 0;
+      width: 100%;
       background: #222;
       border-radius: 8px;
-      margin-top: -5px;
       position: absolute;
+      top: 100%;
+      left: 0;
       z-index: 10;
+      max-height: 200px;
+      overflow-y: auto;
     }
     ul li {
       padding: 10px;
@@ -139,7 +143,7 @@
 
   <h1 style="margin-top:60px;">Escolha sua música 🎤</h1>
   <label>Mesa:</label>
-  <input type="text" id="mesaInput" readonly style="background:#333; color:white;" />
+  <input type="text" id="mesaInput" placeholder="Digite o número da mesa" />
   <div class="container">
     <input id="searchInput" placeholder="Digite o nome da música..." autocomplete="off" />
     <ul id="suggestions"></ul>
@@ -208,16 +212,20 @@
     carregarCatalogo();
 
     searchInput.addEventListener("input", () => {
-      const texto = searchInput.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const texto = searchInput.value.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
       suggestions.innerHTML = "";
       if (!texto || texto.length < 2) return;
       const filtradas = todasAsMusicas.filter(musica =>
-        musica.titulo.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(texto)
+        musica.titulo.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").includes(texto)
       );
       filtradas.forEach(musica => {
         const li = document.createElement("li");
         li.textContent = musica.titulo;
-        li.onclick = () => adicionarMusica(musica);
+        li.onclick = () => {
+          adicionarMusica(musica);
+          searchInput.value = "";
+          suggestions.innerHTML = "";
+        };
         suggestions.appendChild(li);
       });
     });
@@ -246,9 +254,6 @@
           adicionadaEm: firebase.firestore.Timestamp.now()
         })
       });
-
-      searchInput.value = "";
-      suggestions.innerHTML = "";
     }
 
     function observarMusicas() {
