@@ -138,6 +138,7 @@
     <thead><tr><th>#</th><th>Música</th><th>Mesa</th></tr></thead>
     <tbody></tbody>
   </table>
+
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script>
@@ -148,6 +149,7 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+
     const mesaInput = document.getElementById("mesaInput");
     const searchInput = document.getElementById("searchInput");
     const suggestions = document.getElementById("suggestions");
@@ -156,21 +158,9 @@
     const params = new URLSearchParams(window.location.search);
     const mesaURL = params.get("mesa");
     if (mesaURL) { mesaInput.value = mesaURL; observarMusicas(); }
+
     let todasAsMusicas = [];
-    searchInput.addEventListener("input", () => {
-      const texto = searchInput.value.toLowerCase();
-      suggestions.innerHTML = "";
-      if (!texto || texto.length < 2) return;
-      const filtradas = todasAsMusicas.filter(musica =>
-        musica.palavrasChave?.some(p => p.toLowerCase().includes(texto))
-      );
-      filtradas.forEach(musica => {
-        const li = document.createElement("li");
-        li.textContent = musica.titulo;
-        li.onclick = () => adicionarMusica(musica);
-        suggestions.appendChild(li);
-      });
-    });
+
     async function carregarCatalogo() {
       const snapshot = await db.collection("musicasDisponiveis").get();
       todasAsMusicas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -188,6 +178,22 @@
       });
     }
     carregarCatalogo();
+
+    searchInput.addEventListener("input", () => {
+      const texto = searchInput.value.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+      suggestions.innerHTML = "";
+      if (!texto || texto.length < 2) return;
+      const filtradas = todasAsMusicas.filter(musica =>
+        musica.titulo.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").includes(texto)
+      );
+      filtradas.forEach(musica => {
+        const li = document.createElement("li");
+        li.textContent = musica.titulo;
+        li.onclick = () => adicionarMusica(musica);
+        suggestions.appendChild(li);
+      });
+    });
+
     async function adicionarMusica(musica) {
       const mesa = mesaInput.value.trim();
       if (!mesa || isNaN(mesa)) return alert("Informe o número da mesa!");
@@ -202,6 +208,7 @@
         musicas: firebase.firestore.FieldValue.arrayUnion(musica.titulo),
         ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
+
       await db.collection("sistema").doc("filaOrdenada").update({
         musicas: firebase.firestore.FieldValue.arrayUnion({
           mesa,
@@ -211,9 +218,11 @@
           adicionadaEm: firebase.firestore.Timestamp.now()
         })
       });
+
       searchInput.value = "";
       suggestions.innerHTML = "";
     }
+
     function observarMusicas() {
       const mesa = mesaInput.value.trim();
       if (!mesa || isNaN(mesa)) return;
@@ -223,6 +232,7 @@
         contador.textContent = `🎵 Músicas adicionadas: ${musicas.length} / 2`;
       });
     }
+
     function renderizarLista(musicas) {
       listaMusicas.innerHTML = "";
       if (musicas.length === 0) {
@@ -238,6 +248,7 @@
         listaMusicas.appendChild(div);
       });
     }
+
     async function removerMusica(titulo) {
       const mesa = mesaInput.value.trim();
       if (!mesa || isNaN(mesa)) return;
@@ -252,6 +263,7 @@
       await filaRef.set({ musicas: nova }, { merge: true });
     }
     window.removerMusica = removerMusica;
+
     const tabelaBody = document.querySelector("#tabelaFila tbody");
     db.collection("sistema").doc("filaOrdenada").onSnapshot(doc => {
       const dados = doc.data();
