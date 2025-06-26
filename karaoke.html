@@ -430,14 +430,16 @@ async function adicionarMusica(musica) {
   const mesa = mesaInput.value.trim();
   if (!mesa || isNaN(mesa)) return alert("Informe o número da mesa!");
 
-  const mesaRef = db.collection("mesas").doc(mesa);
-  const snap = await mesaRef.get();
-  const musicas = snap.exists ? snap.data().musicas || [] : [];
+const filaRef = await db.collection("sistema").doc("filaOrdenada").get();
+const fila = filaRef.exists ? filaRef.data().musicas || [] : [];
 
-  if (musicas.length >= 2) {
-    alert("Você já adicionou 2 músicas. Aguarde tocar para adicionar mais.");
-    return;
-  }
+const musicasDaMesa = fila.filter(m => m.mesa === mesa);
+
+if (musicasDaMesa.length >= 2) {
+  alert("Você já adicionou 2 músicas. Aguarde as duas tocarem para adicionar mais.");
+  return;
+}
+
 
   await mesaRef.set({
     musicas: firebase.firestore.FieldValue.arrayUnion(musica.titulo),
