@@ -9,7 +9,7 @@
       margin: 0;
       padding: 0;
       background-color: #000;
-      color: white;
+      color: #fff;
       font-family: 'Segoe UI', sans-serif;
       height: 100vh;
       display: flex;
@@ -25,21 +25,37 @@
       background-color: #111;
     }
     #info {
-      font-size: 24px;
-      margin-top: 20px;
+      font-size: 2rem;
+      margin-top: 10px;
       text-align: center;
     }
     #proxima {
-      font-size: 18px;
+      font-size: 1.2rem;
       color: #aaa;
       margin-bottom: 10px;
       text-align: center;
+    }
+    #tabelaFila {
+      width: 90%;
+      max-width: 600px;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+    #tabelaFila th, #tabelaFila td {
+      border: 1px solid #444;
+      padding: 8px;
+      text-align: center;
+      font-size: 0.9rem;
+    }
+    #tabelaFila th {
+      background-color: #222;
     }
     #status {
       background: #222;
       padding: 10px 20px;
       border-radius: 8px;
       color: #0af;
+      margin-bottom: 10px;
     }
   </style>
 </head>
@@ -47,6 +63,12 @@
   <div id="info">Aguardando próxima música...</div>
   <div id="proxima"></div>
   <div id="video"></div>
+  <table id="tabelaFila">
+    <thead>
+      <tr><th>Próximas Músicas</th><th>Mesa</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
   <div id="status">🎵 TV do Karaokê</div>
 
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -64,6 +86,7 @@
 
     const infoDiv = document.getElementById("info");
     const proximaDiv = document.getElementById("proxima");
+    const tabelaBody = document.querySelector('#tabelaFila tbody');
     let player;
     let filaAtual = [];
     let musicaTocandoId = null;
@@ -74,12 +97,22 @@
         proximaDiv.innerText = "";
         player?.stopVideo();
         musicaTocandoId = null;
-        return;
+      } else {
+        const atual = filaAtual[0];
+        const proxima = filaAtual[1];
+        infoDiv.innerText = `🎤 Tocando agora: ${atual.musica} (Mesa ${atual.mesa})`;
+        proximaDiv.innerText = proxima ? `🔜 Próxima: ${proxima.musica} (Mesa ${proxima.mesa})` : "";
       }
-      const atual = filaAtual[0];
-      const proxima = filaAtual[1];
-      infoDiv.innerText = `🎤 Tocando agora: ${atual.musica} (Mesa ${atual.mesa})`;
-      proximaDiv.innerText = proxima ? `🎶 Próxima: ${proxima.musica} (Mesa ${proxima.mesa})` : "";
+      atualizarTabela();
+    }
+
+    function atualizarTabela() {
+      tabelaBody.innerHTML = '';
+      filaAtual.slice(0, 5).forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${item.musica}</td><td>${item.mesa}</td>`;
+        tabelaBody.appendChild(tr);
+      });
     }
 
     function tocarProxima() {
@@ -87,14 +120,12 @@
         atualizarInfos();
         return;
       }
-
       const proxima = filaAtual[0];
-      if (!proxima || !proxima.youtubeId) {
+      if (!proxima?.youtubeId) {
         console.warn("⚠️ Música inválida ou sem youtubeId:", proxima);
         removerMusicaAtual();
         return;
       }
-
       musicaTocandoId = proxima.youtubeId;
       atualizarInfos();
       player.loadVideoById(proxima.youtubeId);
@@ -102,26 +133,19 @@
 
     async function removerMusicaAtual() {
       const removida = filaAtual.shift();
-
       try {
-        // Atualiza filaOrdenada
         await db.collection("sistema").doc("filaOrdenada").set({ musicas: filaAtual }, { merge: true });
-
-        // Atualiza mesa (remove a música da lista da mesa)
-        if (removida?.mesa && removida?.musica) {
-          await db.collection("mesas").doc(removida.mesa).update({
+        if (removida?.mesa) {
+          await db.collection("mesas").doc(String(removida.mesa)).update({
             musicas: firebase.firestore.FieldValue.arrayRemove(removida.musica),
             ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
           });
         }
-
-        // Salva no histórico
         await db.collection("historico").add({
           ...removida,
           tocadaEm: firebase.firestore.FieldValue.serverTimestamp()
         });
-
-        setTimeout(() => tocarProxima(), 1500);
+        setTimeout(tocarProxima, 1500);
       } catch (err) {
         console.error("❌ Erro ao remover música:", err);
       }
@@ -133,21 +157,13 @@
         width: '100%',
         videoId: '',
         events: {
-          onReady: () => {
-            console.log("✅ Player pronto");
-            tocarProxima();
-          },
+          onReady: () => { tocarProxima(); },
           onStateChange: event => {
-            const estado = event.data;
-            const videoIdAtual = player.getVideoData().video_id;
-            if (estado === YT.PlayerState.ENDED && videoIdAtual === musicaTocandoId) {
+            if (event.data === YT.PlayerState.ENDED && player.getVideoData().video_id === musicaTocandoId) {
               removerMusicaAtual();
             }
           },
-          onError: err => {
-            console.warn("❌ Erro no vídeo, pulando:", err);
-            removerMusicaAtual();
-          }
+          onError: () => { removerMusicaAtual(); }
         },
         playerVars: {
           autoplay: 1,
@@ -160,13 +176,10 @@
     }
 
     db.collection("sistema").doc("filaOrdenada").onSnapshot(doc => {
-      const novaFila = doc.data()?.musicas || [];
-      const mudou = JSON.stringify(filaAtual) !== JSON.stringify(novaFila);
-      filaAtual = [...novaFila];
-      if (mudou && player?.getPlayerState() !== YT.PlayerState.PLAYING) {
+      filaAtual = doc.data()?.musicas || [];
+      atualizarInfos();
+      if (player && player.getPlayerState() !== YT.PlayerState.PLAYING) {
         tocarProxima();
-      } else {
-        atualizarInfos();
       }
     });
   </script>
