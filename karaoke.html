@@ -256,19 +256,27 @@ async function buscarOuAdicionarMusica(termo) {
   return { titulo: resultado.titulo, youtubeId: resultado.youtubeId };
 }
 
-async function buscarVideoKaraokeNoYouTube(termo) {
+async function buscarVideoKaraokeNoYouTube(termoOriginal) {
   const apiKey = "AIzaSyDYAeknQpiJy5LfhGyOavpDaDHlUFjohio";
-  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(termo + ' karaoke')}&key=${apiKey}&maxResults=15&type=video&videoEmbeddable=true&order=viewCount`;
+
+  // Prepara o termo sem parênteses e com espaços limpos
+  const termo = termoOriginal.replace(/\(.*?\)/g, '').replace(/-/g, ' ').trim();
+  const termoLower = termo.toLowerCase();
+
+  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(termo + ' karaoke')}&key=${apiKey}&maxResults=10&type=video&videoEmbeddable=true&order=viewCount`;
 
   try {
     const res = await fetch(url);
     const data = await res.json();
 
     if (data.items && data.items.length > 0) {
-      const karaokeValido = data.items.find(v => {
-        const titulo = v.snippet.title.toLowerCase();
+      const karaokeValido = data.items.find(video => {
+        const titulo = video.snippet.title.toLowerCase();
+
         return (
           titulo.includes("karaoke") &&
+          titulo.includes(termoLower.split(" ")[0]) && // nome do artista
+          titulo.includes(termoLower.split(" ").slice(1).join(" ")) && // nome da música
           !titulo.includes("acoustic") &&
           !titulo.includes("acustico") &&
           !titulo.includes("voz e violão") &&
