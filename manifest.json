@@ -1,0 +1,22 @@
+{
+  "name": "Karaokê TV - Esquina's Bar",
+  "short_name": "KaraokêTV",
+  "description": "Reprodução automática das músicas do karaokê do Esquina's Bar",
+  "start_url": "/karaoke-tv.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
