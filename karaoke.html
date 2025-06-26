@@ -353,48 +353,45 @@ window.selecionarSugestao = function(youtubeId) {
 async function buscarVideoKaraokeNoYouTube(termoOriginal) {
   const apiKey = "AIzaSyDYAeknQpiJy5LfhGyOavpDaDHlUFjohio";
 
-  const termo = termoOriginal.replace(/\(.*?\)/g, '').replace(/-/g, ' ').trim();
-  const termoLower = termo.toLowerCase();
+  const termoLimpo = termoOriginal
+    .replace(/\(.*?\)/g, '')
+    .replace(/-/g, ' ')
+    .trim();
 
-  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(termo + ' karaoke')}&key=${apiKey}&maxResults=15&type=video&videoEmbeddable=true&order=viewCount`;
+  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&order=viewCount&q=${encodeURIComponent(termoLimpo + ' karaoke')}&maxResults=10&key=${apiKey}`;
 
   try {
     const res = await fetch(url);
     const data = await res.json();
 
-    if (data.items && data.items.length > 0) {
-      // Ordena por relevância e viewCount já feito pela API
-      const karaokeValido = data.items.find(video => {
-        const titulo = video.snippet.title.toLowerCase();
+    if (!data.items || data.items.length === 0) return null;
 
-        return (
-          titulo.includes("karaoke") &&
-          (
-            titulo.includes(termoLower) || // termo completo
-            termoLower.split(" ").some(p => titulo.includes(p)) // ou partes do termo
-          ) &&
-          !titulo.includes("acoustic") &&
-          !titulo.includes("acustico") &&
-          !titulo.includes("voz e violão") &&
-          !titulo.includes("voz violao") &&
-          !titulo.includes("cover") &&
-          !titulo.includes("live")
-        );
-      });
+    const itemValido = data.items.find(i => {
+      const titulo = i.snippet.title.toLowerCase();
 
-      if (karaokeValido) {
-        return {
-          youtubeId: karaokeValido.id.videoId,
-          titulo: karaokeValido.snippet.title
-        };
-      }
-    }
+      return (
+        !titulo.includes("acoustic") &&
+        !titulo.includes("acustico") &&
+        !titulo.includes("voz e violão") &&
+        !titulo.includes("voz violao") &&
+        !titulo.includes("cover") &&
+        !titulo.includes("live") &&
+        titulo.includes("karaoke")
+      );
+    });
+
+    if (!itemValido) return null;
+
+    return {
+      youtubeId: itemValido.id.videoId,
+      titulo: itemValido.snippet.title
+    };
   } catch (err) {
-    console.error("Erro ao buscar no YouTube:", err);
+    console.error("❌ Erro ao buscar vídeo no YouTube:", err);
+    return null;
   }
-
-  return null;
 }
+
 
 async function buscarOuAdicionarMusica(termo) {
   const termoFormatado = termo.trim().toLowerCase();
