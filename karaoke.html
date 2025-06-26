@@ -297,6 +297,38 @@
   `).join("");
 });
 
+async function buscarOuAdicionarMusica(termo) {
+  const termoFormatado = termo.trim().toLowerCase();
+
+  const querySnap = await db.collection("musicasDisponiveis")
+    .where("titulo_lower", "==", termoFormatado)
+    .limit(1)
+    .get();
+
+  if (!querySnap.empty) {
+    return querySnap.docs[0].data();
+  }
+
+  const resultado = await buscarVideoKaraokeNoYouTube(termo);
+  if (!resultado) {
+    alert("Não foi possível encontrar uma versão de karaokê válida para essa música.");
+    return null;
+  }
+
+  await db.collection("musicasDisponiveis").add({
+    titulo: resultado.titulo,
+    youtubeId: resultado.youtubeId,
+    titulo_lower: termoFormatado,
+    criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+  });
+
+  carregarCatalogo?.();
+
+  return { titulo: resultado.titulo, youtubeId: resultado.youtubeId };
+}
+
+window.buscarOuAdicionarMusica = buscarOuAdicionarMusica; // 👈 ISSO RESOLVE SEU ERRO
+
 
   searchInput.addEventListener("keydown", async (e) => {
   if (e.key === "Enter") {
@@ -499,8 +531,6 @@ function toggleCatalogo() {
   wrapper.style.display = isVisible ? "none" : "block";
   btn.textContent = isVisible ? "🎼 Ver Catálogo" : "🔽 Ocultar Catálogo";
 }
-
-window.buscarOuAdicionarMusica = buscarOuAdicionarMusica;
 
 </script>
 
