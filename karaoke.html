@@ -153,6 +153,48 @@
   background: #333;
 }
 
+#toggleBtn {
+  background: #444;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 16px;
+}
+
+#catalogoContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  background: #1c1c1c;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #333;
+}
+
+.catalogo-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  background: #2a2a2a;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.catalogo-card button {
+  background: #ff0077;
+  border: none;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
     .header-info div { padding: 0 10px; }
   </style>
 </head>
@@ -175,7 +217,11 @@
     <div id="listaMusicas"></div>
   </div>
   <h3>📚 Catálogo completo:</h3>
+<button onclick="toggleCatalogo()" id="toggleBtn">🎼 Ver Catálogo</button>
+<div id="catalogoWrapper" style="display: none;">
   <div id="catalogoContainer"></div>
+</div>
+
   <h3>📊 Fila Geral (ao vivo)</h3>
   <table id="tabelaFila">
     <thead><tr><th>#</th><th>Música</th><th>Mesa</th></tr></thead>
@@ -460,6 +506,15 @@ db.collection("sistema").doc("filaOrdenada").onSnapshot(doc => {
   tabelaBody.innerHTML = fila.map((m, i) => `
     <tr><td>${i + 1}</td><td>${m.musica || "-"}</td><td>${m.mesa || "-"}</td></tr>`).join("");
 });
+
+function toggleCatalogo() {
+  const wrapper = document.getElementById("catalogoWrapper");
+  const btn = document.getElementById("toggleBtn");
+  const isVisible = wrapper.style.display === "block";
+
+  wrapper.style.display = isVisible ? "none" : "block";
+  btn.textContent = isVisible ? "🎼 Ver Catálogo" : "🔽 Ocultar Catálogo";
+}
 
 
 </script>
