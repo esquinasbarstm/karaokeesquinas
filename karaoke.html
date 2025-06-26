@@ -259,7 +259,6 @@ async function buscarOuAdicionarMusica(termo) {
 async function buscarVideoKaraokeNoYouTube(termoOriginal) {
   const apiKey = "AIzaSyDYAeknQpiJy5LfhGyOavpDaDHlUFjohio";
 
-  // Prepara o termo sem parênteses e com espaços limpos
   const termo = termoOriginal.replace(/\(.*?\)/g, '').replace(/-/g, ' ').trim();
   const termoLower = termo.toLowerCase();
 
@@ -275,8 +274,10 @@ async function buscarVideoKaraokeNoYouTube(termoOriginal) {
 
         return (
           titulo.includes("karaoke") &&
-          titulo.includes(termoLower.split(" ")[0]) && // nome do artista
-          titulo.includes(termoLower.split(" ").slice(1).join(" ")) && // nome da música
+          (
+            titulo.includes(termoLower) || // termo completo
+            termoLower.split(" ").some(p => titulo.includes(p)) // ou alguma palavra do termo
+          ) &&
           !titulo.includes("acoustic") &&
           !titulo.includes("acustico") &&
           !titulo.includes("voz e violão") &&
@@ -299,6 +300,7 @@ async function buscarVideoKaraokeNoYouTube(termoOriginal) {
 
   return null;
 }
+
 
 async function adicionarMusica(musica) {
   const mesa = mesaInput.value.trim();
