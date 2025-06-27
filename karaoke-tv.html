@@ -2,9 +2,9 @@
 <html lang="pt-BR">
 <head>
   <link rel="manifest" href="/manifest.json" />
-<meta name="theme-color" content="#000000" />
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#000000" />
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Karaokê TV - Esquina's Bar</title>
@@ -15,85 +15,98 @@
       background-color: #000;
       color: #fff;
       font-family: 'Segoe UI', sans-serif;
-      height: 100vh;
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: flex-start;
     }
+
+    #info, #proxima {
+      font-size: 1rem;
+      text-align: center;
+      margin-top: 5px;
+      padding: 4px 10px;
+      max-width: 90%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #musicaAtual, #proximaMusica {
+      position: fixed;
+      top: 10px;
+      padding: 8px 14px;
+      background: rgba(0,0,0,0.7);
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: bold;
+      z-index: 1000;
+      max-width: 40%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #musicaAtual {
+      left: 10px;
+      color: lime;
+    }
+
+    #proximaMusica {
+      right: 10px;
+      color: #ff5b5b;
+    }
+
     #video {
       width: 100%;
       max-width: 1280px;
       aspect-ratio: 16 / 9;
-      margin: 20px 0;
+      margin: 60px 0 20px;
       background-color: #111;
     }
-    #info {
-      font-size: 2rem;
-      margin-top: 10px;
-      text-align: center;
-    }
-    #proxima {
-      font-size: 1.2rem;
-      color: #aaa;
-      margin-bottom: 10px;
-      text-align: center;
-    }
+
     #tabelaFila {
       width: 90%;
       max-width: 600px;
       border-collapse: collapse;
       margin-bottom: 20px;
     }
+
     #tabelaFila th, #tabelaFila td {
       border: 1px solid #444;
       padding: 8px;
       text-align: center;
       font-size: 0.9rem;
     }
+
     #tabelaFila th {
       background-color: #222;
     }
+
     #status {
       background: #222;
       padding: 10px 20px;
       border-radius: 8px;
       color: #0af;
-      margin-bottom: 10px;
-    }
-    .painel-esquerda, .painel-direita {
-      position: absolute;
-      top: 10px;
-      padding: 10px 16px;
-      background: rgba(0,0,0,0.7);
-      border-radius: 8px;
-      font-size: 18px;
-      font-weight: bold;
-      z-index: 10;
-    }
-    .painel-esquerda {
-      left: 10px;
-      color: lime;
-    }
-    .painel-direita {
-      right: 10px;
-      color: #ff5b5b;
+      margin-bottom: 20px;
     }
   </style>
 </head>
 <body>
-  <div id="musicaAtual" class="painel-esquerda">🎤 Tocando agora: -</div>
-  <div id="proximaMusica" class="painel-direita">⏭ Próxima: -</div>
+  <div id="musicaAtual">🎤 Tocando agora: -</div>
+  <div id="proximaMusica">⏭ Próxima: -</div>
 
   <div id="info">Aguardando próxima música...</div>
   <div id="proxima"></div>
   <div id="video"></div>
+
   <table id="tabelaFila">
     <thead>
       <tr><th>Próximas Músicas</th><th>Mesa</th></tr>
     </thead>
     <tbody></tbody>
   </table>
+
   <div id="status">🎵 TV do Karaokê</div>
 
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
