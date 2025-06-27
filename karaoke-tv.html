@@ -57,12 +57,13 @@
       color: #ff5b5b;
     }
 
-#video {
+#video-container {
   position: relative;
   width: 100vw;
-  padding-top: 56.25%; /* 16:9 aspect ratio */
+  height: calc(100vw * 9 / 16); /* Garante proporção 16:9 */
   background-color: #111;
   margin-top: 60px;
+  overflow: hidden;
 }
 
 #video iframe {
@@ -72,6 +73,7 @@
   width: 100%;
   height: 100%;
 }
+
 
 
     #tabelaFila {
@@ -107,7 +109,9 @@
 
   <div id="info">Aguardando próxima música...</div>
   <div id="proxima"></div>
+<div id="video-container">
   <div id="video"></div>
+</div>
 
   <table id="tabelaFila">
     <thead>
